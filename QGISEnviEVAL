@@ -1,0 +1,2399 @@
+# QGIS 플러그인 개발 실무 교재
+## 설계엔지니어링을 위한 기초조사 · 입지선정 · 환경영향성 평가 플러그인 개발
+
+- 대상 QGIS 버전: **QGIS 3.6 이상 ~ QGIS 4.x** (Qt5/Qt6 동시 호환 전략 포함)
+- 권장 개발 기준: QGIS 3.44 LTR(호환 하한 검증) + QGIS 4.2(최신 기준)
+- 주요 기술: Python / PyQGIS / `qgis.PyQt` / Processing Framework / Qt Designer
+- 대상 독자: 도로 · 수자원 · 철도 · 도시계획 설계엔지니어링 실무자, GIS 업무자동화 개발자
+- 문서 성격: 출판용 교재 초안 (전체 목차 + 핵심 장 본문 + 실전 프로젝트 3종 전체 코드)
+
+---
+
+# 교재 개요
+
+## 이 책이 다루는 것
+
+설계엔지니어링 프로젝트(도로, 수자원, 철도, 도시계획)의 초기 단계 업무는
+공통적으로 다음 세 가지 GIS 작업으로 수렴한다.
+
+1. **기초조사(Site Investigation)**
+   — 사업대상지 주변의 지형·지적·토지이용·행정경계·보호구역 등
+   공간정보를 수집하고 현황을 정리하는 작업
+2. **입지선정(Site Selection)**
+   — 다수의 평가 기준(경사, 접근성, 규제, 환경 민감도 등)을 중첩·가중 평가하여
+   최적 노선/부지/시설 위치를 도출하는 작업
+3. **환경영향성 평가(Environmental Impact Screening)**
+   — 사업지가 법정 보호지역·환경 민감지역과 얼마나 중첩/근접하는지 정량화하고
+   협의 대상 여부를 사전 검토(스크리닝)하는 작업
+
+이 세 업무는 매 프로젝트마다 반복되지만, 실무 현장에서는 여전히
+수작업 중첩분석과 엑셀 정리에 의존하는 경우가 많다.
+이 책은 이 반복 업무를 **QGIS 플러그인으로 제품화**하는 전 과정을 다룬다.
+
+## 이 책이 다루지 않는 것
+
+- QGIS 기본 사용법 (레이어 추가, 심볼 설정 등의 초급 조작)
+- 법정 환경영향평가서 작성 실무 자체 (본 교재는 GIS 스크리닝 자동화까지 다룸)
+- C++ 플러그인 개발
+
+## 버전 정책 — 왜 3.6부터 4.x까지인가
+
+| 환경 | 현실 |
+|---|---|
+| 공공기관 · 대형 설계사 | 검증된 구버전(3.x 초기~LTR) 고정 사용 사례 다수 |
+| 신규 도입 조직 | QGIS 4.x + Qt6 |
+| 플러그인 저장소 | QGIS 4 대응이 사실상 필수화 |
+
+따라서 본 교재의 모든 예제는 다음 원칙으로 작성한다.
+
+> **원칙 1.** import는 항상 `qgis.PyQt`를 사용한다. (PyQt5/PyQt6 직접 import 금지)
+> **원칙 2.** Qt enum은 항상 **완전수식(fully-qualified)** 형태로 쓴다.
+> `Qt.Checked` ❌ → `Qt.CheckState.Checked` ⭕
+> **원칙 3.** 버전 분기가 필요한 API는 `compat.py` 모듈 한 곳에 모은다.
+> **원칙 4.** `metadata.txt`의 `qgisMinimumVersion=3.6`으로 선언하되,
+> 3.6에 없는 API를 사용하는 기능은 런타임 버전 체크로 우아하게 비활성화한다.
+
+---
+
+# 전체 목차
+
+## Part I. 기초 — 플러그인 개발 환경과 3.x/4.x 호환 전략
+- Chapter 1. QGIS를 설계엔지니어링 개발 플랫폼으로 이해하기
+- Chapter 2. 개발환경 구축 (3.44 LTR + 4.2 병행)
+- Chapter 3. 플러그인 구조와 생명주기
+- Chapter 4. QGIS 3.6 ~ 4.x 호환 코딩 규칙 (본 교재의 핵심 기반)
+
+## Part II. 공통 핵심 기술
+- Chapter 5. 국내 공간정보 데이터 소스와 좌표계 (EPSG:5186 등)
+- Chapter 6. 벡터 · 래스터 분석 API 핵심
+- Chapter 7. Processing Framework — 알고리즘 · Provider · 모델
+- Chapter 8. UI 개발 — Qt Designer, DockWidget, QGIS 전용 위젯
+- Chapter 9. QgsTask — 대용량 데이터의 백그라운드 처리
+- Chapter 10. 보고서 자동 출력 (QgsLayout, HTML/PDF)
+
+## Part III. 실전 프로젝트 1 — 기초조사 플러그인 (SiteSurveyor)
+- Chapter 11. 요구사항 정의와 아키텍처
+- Chapter 12. 사업지 정의 · 조사반경 · 레이어 자동 클리핑
+- Chapter 13. 현황 통계 집계와 조사 보고서 생성
+- Chapter 14. 전체 소스 코드
+
+## Part IV. 실전 프로젝트 2 — 입지선정 플러그인 (SiteSelector)
+- Chapter 15. MCDA 이론 — 가중중첩, AHP, 제약/기회 분석
+- Chapter 16. 래스터 표준화 · 재분류 · 가중합산 구현
+- Chapter 17. AHP 가중치 계산기와 일관성 검증(CR)
+- Chapter 18. 전체 소스 코드 (Processing Algorithm)
+
+## Part V. 실전 프로젝트 3 — 환경영향성 평가 플러그인 (EIA Screener)
+- Chapter 19. 환경영향평가 스크리닝의 GIS 로직
+- Chapter 20. 보호지역 중첩·근접 분석 엔진
+- Chapter 21. 지형영향(경사·표고·절성토) 분석
+- Chapter 22. 스크리닝 결과표와 평가 보고서 자동화
+- Chapter 23. 전체 소스 코드
+
+## Part VI. 분야별 응용
+- Chapter 24. 도로 — 노선대 비교 · 대안노선 평가
+- Chapter 25. 수자원 — 유역 기반 조사 · 취수원 보호
+- Chapter 26. 철도 — 선형 제약과 정거장 입지
+- Chapter 27. 도시계획 — 개발가능지 분석 · 용도지역 검토
+
+## Part VII. 품질 · 배포 · 유지보수
+- Chapter 28. 테스트 (pytest, headless QGIS)
+- Chapter 29. 3.x/4.x 이중 검증과 pyqgis4-checker
+- Chapter 30. QGIS Plugin Repository 배포와 CI/CD
+
+## 부록
+- A. 3.x ↔ 4.x API 대조표
+- B. 국내 공간정보 데이터 소스 목록
+- C. metadata.txt 전체 필드 해설
+- D. 참고문헌 · 공식 문서 URL
+
+---
+---
+
+# Part I. 기초 — 플러그인 개발 환경과 3.x/4.x 호환 전략
+
+---
+
+# Chapter 1. QGIS를 설계엔지니어링 개발 플랫폼으로 이해하기
+
+## 1.1 왜 QGIS 플러그인인가
+
+설계엔지니어링 조직에서 GIS 자동화 도구를 만드는 선택지는 세 가지다.
+
+| 선택지 | 장점 | 단점 |
+|---|---|---|
+| 독립 Python 스크립트 (GDAL/GeoPandas) | 배포 자유 | 시각화·상호작용 없음, 비개발자 사용 불가 |
+| 상용 GIS 확장 (ArcGIS 등) | 성숙한 생태계 | 라이선스 비용, 좌석 제한 |
+| **QGIS 플러그인** | 무료, 전사 배포 용이, GUI 제공, Processing 연계 | QGIS 버전 관리 필요 |
+
+실무자가 이미 QGIS로 도면과 데이터를 보고 있다면,
+자동화 도구를 "그 화면 안의 버튼 하나"로 제공하는 것이 도입 장벽이 가장 낮다.
+
+## 1.2 QGIS 아키텍처 한 장 요약
+
+```text
+┌─────────────────────────────────────────────┐
+│                QGIS Desktop                  │
+│  ┌──────────┐ ┌──────────┐ ┌─────────────┐  │
+│  │ qgis.gui │ │ qgis.core│ │ Processing  │  │
+│  │ 캔버스/위젯│ │ 레이어/도형│ │ 알고리즘/모델│  │
+│  └────┬─────┘ └────┬─────┘ └──────┬──────┘  │
+│       └─────────┬──┴──────────────┘         │
+│            Python (PyQGIS)                   │
+│                 │                            │
+│      ┌──────────┴──────────┐                 │
+│      │  Qt (5.x / 6.x)     │                 │
+│      └──────────┬──────────┘                 │
+│   GDAL · PROJ · GEOS · SQLite/SpatiaLite     │
+└─────────────────────────────────────────────┘
+```
+
+플러그인 개발자가 만나는 계층은 세 곳이다.
+
+- `qgis.core` — 프로젝트, 레이어, 지오메트리, 좌표계, Processing
+- `qgis.gui` — 맵 캔버스, 맵 툴, QGIS 전용 위젯(레이어 콤보 등)
+- `qgis.PyQt` — Qt 위젯/시그널 (버전 호환 계층)
+
+## 1.3 설계엔지니어링 3대 업무의 GIS 분해
+
+### 기초조사
+```text
+사업지 경계(SHP/좌표/도면)
+  → 조사반경 버퍼
+  → 주제도 클리핑 (지적, 토지이용, 행정경계, 보호구역, 하천, 도로...)
+  → 항목별 면적/연장/필지수 집계
+  → 조사 현황표 + 도면 출력
+```
+
+### 입지선정
+```text
+평가기준 레이어 준비 (경사, 표고, 도로접근성, 하천이격, 규제...)
+  → 기준별 표준화(0~1) 또는 등급화(1~5)
+  → 제약지역(절대 배제) 마스킹
+  → AHP 등으로 가중치 결정
+  → 가중합산(Weighted Overlay)
+  → 적합도 지도 + 후보지 순위
+```
+
+### 환경영향성 평가 (스크리닝)
+```text
+사업지 + 영향권 버퍼
+  → 법정 보호지역/환경 민감지역 중첩·근접 검사
+  → 항목별 중첩면적·최단거리 산출
+  → 협의대상 판정 로직
+  → 스크리닝 결과표 + 검토 보고서
+```
+
+세 업무 모두 **"입력 지역 → 다수 레이어와의 공간관계 → 표/보고서"** 라는
+동일한 골격을 가진다. 이 골격을 Part II에서 공통 기술로 익히고,
+Part III~V에서 세 개의 완결된 플러그인으로 구현한다.
+
+---
+
+# Chapter 2. 개발환경 구축
+
+## 2.1 이중 설치 전략
+
+3.6~4.x 호환 플러그인을 만들려면 **최소 두 개의 QGIS를 병행 설치**한다.
+
+| 설치 | 목적 |
+|---|---|
+| QGIS 3.44 LTR (Qt5) | 3.x 계열 호환 검증 기준 |
+| QGIS 4.2 (Qt6) | 최신 기준 개발 |
+| (선택) QGIS 3.16 또는 3.6 VM | 하한 버전 스모크 테스트 |
+
+> **TIP** — 3.6 원본 설치가 어려운 경우, 3.6에 존재하지 않는 API 사용 여부를
+> 부록 A의 대조표와 PyQGIS 버전별 문서로 정적 점검하는 방식으로 갈음할 수 있다.
+
+## 2.2 플러그인 폴더 위치
+
+QGIS 프로파일별 플러그인 폴더:
+
+```text
+Windows:
+%APPDATA%\QGIS\QGIS3\profiles\default\python\plugins\
+
+Linux:
+~/.local/share/QGIS/QGIS3/profiles/default/python/plugins/
+
+macOS:
+~/Library/Application Support/QGIS/QGIS3/profiles/default/python/plugins/
+```
+
+QGIS 4는 별도 프로파일 경로(`QGIS4`)를 사용하므로,
+개발 중에는 심볼릭 링크로 소스 저장소를 양쪽에 연결한다.
+
+```powershell
+# Windows (관리자 PowerShell)
+New-Item -ItemType SymbolicLink `
+  -Path "$env:APPDATA\QGIS\QGIS3\profiles\default\python\plugins\site_surveyor" `
+  -Target "D:\dev\site_surveyor"
+```
+
+## 2.3 필수 개발 플러그인
+
+| 플러그인 | 용도 |
+|---|---|
+| Plugin Reloader | QGIS 재시작 없이 플러그인 재로드 |
+| Plugin Builder (3/4) | 템플릿 생성 |
+| First Aid (선택) | 예외 발생 시 디버거 |
+
+## 2.4 개발 사이클
+
+```text
+VS Code에서 코드 수정 → 저장
+        ↓
+QGIS에서 Plugin Reloader (단축키 F5 지정 권장)
+        ↓
+동작 확인 · Python 콘솔에서 객체 검사
+        ↓
+QGIS 3.44에서 동일 절차 재검증
+```
+
+---
+
+# Chapter 3. 플러그인 구조와 생명주기
+
+## 3.1 최소 구조
+
+```text
+site_surveyor/
+├── __init__.py        # classFactory 진입점
+├── metadata.txt       # 플러그인 메타데이터 (필수)
+├── plugin.py          # 메인 플러그인 클래스
+├── compat.py          # 3.x/4.x 호환 계층 (본 교재 표준)
+├── icon.svg
+├── gui/               # 다이얼로그, 독위젯, .ui
+├── core/              # 순수 분석 로직 (QGIS GUI 비의존)
+├── processing/        # Processing Provider · Algorithm
+├── i18n/              # 번역
+└── tests/
+```
+
+> **ENGINEERING PRACTICE** — `core/`의 분석 로직은 `qgis.gui`를 import하지 않는다.
+> GUI 없는 headless 테스트와 `qgis_process` CLI 실행이 가능해진다.
+
+## 3.2 생명주기
+
+```text
+QGIS 시작 / 플러그인 활성화
+        ↓
+__init__.py : classFactory(iface) 호출
+        ↓
+plugin.py : Plugin(iface) 생성
+        ↓
+initGui() — 메뉴·툴바·Provider 등록
+        ↓
+(사용자 상호작용)
+        ↓
+unload() — 등록한 모든 것을 반드시 해제
+```
+
+## 3.3 metadata.txt — 3.6~4.x 선언
+
+```ini
+[general]
+name=Site Surveyor
+qgisMinimumVersion=3.6
+qgisMaximumVersion=4.99
+description=설계엔지니어링 기초조사 자동화 (조사반경 클리핑·현황 집계·보고서)
+version=1.0.0
+author=Your Company GIS Team
+email=gis@example.com
+about=도로·수자원·철도·도시계획 사업의 기초조사 업무를 자동화합니다.
+tracker=https://github.com/yourorg/site-surveyor/issues
+repository=https://github.com/yourorg/site-surveyor
+tags=survey,engineering,korea,clip,report
+category=Vector
+icon=icon.svg
+experimental=False
+supportsQt6=True
+```
+
+> **WARNING** — QGIS 4 대응 플러그인은 `supportsQt6=True` 선언이 필요하다.
+> 이 플래그가 없으면 QGIS 4에서 로드 대상에서 제외될 수 있다.
+> 저장소 정책은 변경될 수 있으므로 배포 전
+> https://plugins.qgis.org/docs/migrate-qgis4 를 반드시 재확인한다.
+
+## 3.4 최소 동작 플러그인
+
+`__init__.py`
+
+```python
+def classFactory(iface):
+    from .plugin import SiteSurveyorPlugin
+    return SiteSurveyorPlugin(iface)
+```
+
+`plugin.py`
+
+```python
+from qgis.PyQt.QtWidgets import QAction
+from qgis.PyQt.QtGui import QIcon
+import os
+
+
+class SiteSurveyorPlugin:
+
+    def __init__(self, iface):
+        self.iface = iface
+        self.plugin_dir = os.path.dirname(__file__)
+        self.actions = []
+
+    def initGui(self):
+        icon = QIcon(os.path.join(self.plugin_dir, "icon.svg"))
+        action = QAction(icon, "기초조사 실행", self.iface.mainWindow())
+        action.triggered.connect(self.run)
+        self.iface.addToolBarIcon(action)
+        self.iface.addPluginToMenu("&Site Surveyor", action)
+        self.actions.append(action)
+
+    def unload(self):
+        for action in self.actions:
+            self.iface.removeToolBarIcon(action)
+            self.iface.removePluginMenu("&Site Surveyor", action)
+        self.actions.clear()
+
+    def run(self):
+        self.iface.messageBar().pushSuccess(
+            "Site Surveyor", "플러그인이 정상 로드되었습니다."
+        )
+```
+
+---
+
+# Chapter 4. QGIS 3.6 ~ 4.x 호환 코딩 규칙 ★핵심
+
+이 장의 규칙은 이후 모든 코드에 예외 없이 적용된다.
+
+## 4.1 import 규칙
+
+```python
+# ⭕ 항상 이렇게
+from qgis.PyQt.QtCore import Qt, QCoreApplication
+from qgis.PyQt.QtWidgets import QDialog, QVBoxLayout, QAction
+from qgis.PyQt.QtGui import QIcon, QColor
+
+# ❌ 절대 금지 — Qt5/Qt6 어느 한쪽에서 깨진다
+from PyQt5.QtWidgets import QAction
+from PyQt6.QtWidgets import QAction
+```
+
+`qgis.PyQt`는 QGIS가 자신이 빌드된 Qt 바인딩으로 자동 매핑해 주는
+호환 계층이다. QGIS 3에서는 PyQt5로, QGIS 4에서는 PyQt6로 연결된다.
+
+## 4.2 Qt enum 완전수식 규칙
+
+PyQt6는 스코프 enum만 허용한다. PyQt5(5.15+)는 두 형태를 모두 허용하므로,
+**완전수식 형태로 쓰면 양쪽에서 동작한다.**
+
+```python
+# ❌ PyQt6에서 AttributeError
+item.setCheckState(Qt.Checked)
+dlg.setWindowModality(Qt.ApplicationModal)
+
+# ⭕ 3.x / 4.x 공통 동작
+item.setCheckState(Qt.CheckState.Checked)
+dlg.setWindowModality(Qt.WindowModality.ApplicationModal)
+```
+
+> **TIP** — 기존 3.x용 코드를 일괄 변환할 때는 QGIS 공식 스크립트
+> `pyqt5_to_pyqt6.py` 와 `pyqis4-checker`(Docker)를 사용한다. (Chapter 29)
+
+## 4.3 필드 타입 — QVariant 문제
+
+QGIS 4/Qt6 환경에서는 `QVariant.Int` 같은 타입 상수 사용이 제거/변경되었다.
+필드 생성 코드는 반드시 `compat.py`를 경유한다.
+
+`compat.py`
+
+```python
+"""QGIS 3.6 ~ 4.x 호환 계층. 버전 분기는 이 파일에만 존재한다."""
+from qgis.core import Qgis
+
+# 3.44 → 34400, 4.2 → 40200 형태의 정수
+QGIS_VERSION_INT = Qgis.QGIS_VERSION_INT
+IS_QGIS4 = QGIS_VERSION_INT >= 40000
+
+if IS_QGIS4:
+    from qgis.PyQt.QtCore import QMetaType
+    TYPE_INT = QMetaType.Type.Int
+    TYPE_DOUBLE = QMetaType.Type.Double
+    TYPE_STRING = QMetaType.Type.QString
+else:
+    from qgis.PyQt.QtCore import QVariant
+    TYPE_INT = QVariant.Int
+    TYPE_DOUBLE = QVariant.Double
+    TYPE_STRING = QVariant.String
+
+
+def make_field(name, ftype, len_=0, prec=0):
+    from qgis.core import QgsField
+    return QgsField(name, ftype, len=len_, prec=prec)
+```
+
+사용:
+
+```python
+from .compat import make_field, TYPE_DOUBLE, TYPE_STRING
+
+fields = [
+    make_field("항목", TYPE_STRING, 50),
+    make_field("면적_m2", TYPE_DOUBLE, 20, 3),
+]
+```
+
+## 4.4 런타임 버전 체크로 기능 게이팅
+
+3.6에 존재하지 않는 API(예: 일부 QgsProcessing 파라미터 타입,
+`QgsTask` 편의 함수 등)를 쓰는 기능은 버전 체크로 감싼다.
+
+```python
+from .compat import QGIS_VERSION_INT
+
+def supports_feature_x():
+    return QGIS_VERSION_INT >= 31600   # 3.16+
+
+# UI에서
+self.btn_advanced.setEnabled(supports_feature_x())
+if not supports_feature_x():
+    self.btn_advanced.setToolTip("QGIS 3.16 이상에서 사용 가능합니다.")
+```
+
+> **ENGINEERING PRACTICE** — "구버전에서 조용히 죽는 플러그인"이 최악이다.
+> 지원 불가 기능은 비활성화 + 안내 툴팁으로 명시한다.
+
+## 4.5 시그널 연결 스타일
+
+```python
+# ⭕ new-style, 3.x/4.x 공통
+self.button.clicked.connect(self.on_clicked)
+layer.selectionChanged.connect(self.on_selection)
+
+# 해제도 짝을 맞춘다 (unload 누수 방지)
+self.button.clicked.disconnect(self.on_clicked)
+```
+
+## 4.6 자주 발생하는 3.x → 4.x 파손 지점 요약
+
+| 항목 | 3.x (Qt5) | 4.x (Qt6) | 대응 |
+|---|---|---|---|
+| enum | `Qt.Checked` 허용 | 스코프 enum 강제 | 완전수식 통일 |
+| 필드 타입 | `QVariant.Int` | `QMetaType.Type.Int` | compat.py |
+| `QDesktopWidget` | 존재 | 제거 | `QScreen` 사용 |
+| `exec_()` | 표준 | `exec()` | `exec()`로 통일 (PyQt5도 지원) |
+| resources.qrc(pyrcc5) | 일반적 | pyrcc 제거 | 아이콘은 파일 경로 직접 로드 권장 |
+| 일부 deprecated PyQGIS | 경고 | 제거 | 부록 A 대조표 |
+
+> **WARNING** — 본 교재는 `resources.py`(qrc 컴파일) 방식을 사용하지 않는다.
+> 아이콘·리소스는 `os.path.join(plugin_dir, ...)` 파일 경로로 직접 로드한다.
+> 이것이 Qt5/Qt6 양쪽에서 가장 단순하고 안전하다.
+
+---
+---
+
+# Part II. 공통 핵심 기술
+
+---
+
+# Chapter 5. 국내 공간정보 데이터 소스와 좌표계
+
+## 5.1 기초조사·입지선정·환경평가에 필요한 국내 데이터
+
+| 분류 | 데이터 | 주요 출처 | 비고 |
+|---|---|---|---|
+| 지형 | 수치지형도, DEM(5m/90m) | 국토정보플랫폼(NGII) | 등고·표고·경사 원천 |
+| 지적 | 연속지적도 | 국가공간정보포털(NSDI), V-World | 필지 집계 |
+| 행정 | 행정경계(시군구/읍면동) | NSDI, 통계청 SGIS | 현황표 구획 |
+| 토지 | 토지이용현황도, 토지피복지도 | 환경공간정보서비스(EGIS) | 토지피복 대/중/세분류 |
+| 규제 | 용도지역지구, 토지이용규제 | NSDI, 토지이음(LURIS) | 입지 제약 |
+| 환경 | 생태자연도, 국토환경성평가지도 | EGIS | 환경평가 핵심 |
+| 보호구역 | 상수원보호구역, 야생생물보호구역, 습지보호지역, 백두대간, 공원구역 | EGIS, KPZ(보호지역통합 DB) | 스크리닝 대상 |
+| 수자원 | 하천망, 유역도, 수문관측 | WAMIS, 국가수자원관리종합정보 | 수자원 분야 |
+| 교통 | 도로망, 철도망 | 국가교통DB(KTDB), NSDI | 접근성 분석 |
+| 재해 | 산사태위험지도, 침수흔적도 | 산림청, 행안부 | 위험 회피 기준 |
+
+> **TIP** — 데이터별 좌표계·갱신주기·제공포맷이 제각각이다.
+> 플러그인 설계 시 "입력 레이어를 사용자가 지정"하는 구조로 두고,
+> 데이터 자동 다운로드는 별도 확장 기능(API 키 필요)으로 분리하는 것이 안전하다.
+
+## 5.2 한국 좌표계 실무 정리
+
+| EPSG | 이름 | 용도 |
+|---|---|---|
+| 5179 | Korea 2000 / UTM-K | 전국 단일 좌표계 (도로명주소 기반) |
+| 5185 | Korea 2000 / 서부원점 | 지적·수치지형도 |
+| **5186** | Korea 2000 / 중부원점 | 지적·수치지형도 (수도권·중부) |
+| 5187 | Korea 2000 / 동부원점 | 지적·수치지형도 |
+| 5188 | Korea 2000 / 동해원점 | 울릉·독도 |
+| 4326 | WGS84 경위도 | GPS·웹 |
+
+**면적·거리 집계는 반드시 투영좌표계에서 수행**한다.
+플러그인은 입력 레이어가 지리좌표계(4326 등)이면 경고 후
+사업지 위치 기반으로 적절한 투영좌표계로 변환하도록 설계한다.
+
+```python
+from qgis.core import (QgsCoordinateReferenceSystem,
+                       QgsCoordinateTransform, QgsProject)
+
+def transform_geom(geom, src_crs, dst_epsg=5186):
+    dst = QgsCoordinateReferenceSystem(f"EPSG:{dst_epsg}")
+    tr = QgsCoordinateTransform(src_crs, dst, QgsProject.instance())
+    g = QgsGeometry(geom)   # 원본 보존
+    g.transform(tr)
+    return g
+```
+
+> **WARNING** — `QgsGeometry.transform()`은 **제자리(in-place) 변환**이다.
+> 원본을 보존하려면 위처럼 복사본을 만들어 변환한다.
+
+---
+
+# Chapter 6. 벡터 · 래스터 분석 API 핵심
+
+## 6.1 레이어 열기와 검증
+
+```python
+from qgis.core import QgsVectorLayer, QgsRasterLayer
+
+vlayer = QgsVectorLayer(r"D:\data\연속지적도.gpkg|layername=jijuk", "지적", "ogr")
+if not vlayer.isValid():
+    raise RuntimeError("레이어를 열 수 없습니다: " + vlayer.error().summary())
+
+rlayer = QgsRasterLayer(r"D:\data\dem_5m.tif", "DEM")
+```
+
+## 6.2 공간 필터로 피처 반복 — 성능의 90%
+
+```python
+from qgis.core import QgsFeatureRequest
+
+# ❌ 전체 순회 후 파이썬에서 판정 — 수십만 필지에서 수 분
+for f in vlayer.getFeatures():
+    if f.geometry().intersects(site_geom):
+        ...
+
+# ⭕ 공간 인덱스 활용 요청 — BBox 1차 필터 + 필요한 속성만
+req = (QgsFeatureRequest()
+       .setFilterRect(site_geom.boundingBox())
+       .setSubsetOfAttributes(["지목", "면적"], vlayer.fields()))
+for f in vlayer.getFeatures(req):
+    if f.geometry().intersects(site_geom):   # 정밀 판정
+        ...
+```
+
+> **ENGINEERING PRACTICE** — 연속지적도 전국 데이터는 수천만 필지다.
+> ①`setFilterRect` ②`setSubsetOfAttributes` ③가능하면 Processing 알고리즘 위임,
+> 이 세 가지가 기초조사 플러그인 성능의 핵심이다.
+
+## 6.3 지오메트리 연산 요약
+
+```python
+inter = geom_a.intersection(geom_b)     # 중첩부
+area_m2 = inter.area()                  # 투영좌표계 전제
+dist_m = geom_a.distance(geom_b)        # 최단거리
+buf = site_geom.buffer(500, 24)         # 500m 버퍼(세그먼트 24)
+```
+
+정밀 면적(타원체 면적)이 필요한 보고서에는 `QgsDistanceArea`를 사용한다.
+
+```python
+from qgis.core import QgsDistanceArea, QgsCoordinateReferenceSystem, QgsProject
+da = QgsDistanceArea()
+da.setSourceCrs(layer.crs(), QgsProject.instance().transformContext())
+da.setEllipsoid("GRS80")
+area = da.measureArea(feature.geometry())
+```
+
+## 6.4 래스터 값 읽기 — DEM 표고 조회
+
+```python
+def sample_dem(rlayer, point):
+    """point: QgsPointXY (래스터와 동일 CRS)"""
+    val, ok = rlayer.dataProvider().sample(point, 1)  # band 1
+    return val if ok else None
+```
+
+## 6.5 Processing 알고리즘 호출 — 분석의 표준 경로
+
+직접 지오메트리 루프를 짜기 전에, 검증된 Processing 알고리즘이 있는지
+먼저 확인한다. 클리핑·버퍼·경사도·재분류는 모두 기성 알고리즘이 있다.
+
+```python
+import processing
+
+clipped = processing.run("native:clip", {
+    "INPUT": land_use_layer,
+    "OVERLAY": survey_area_layer,
+    "OUTPUT": "memory:clipped"
+})["OUTPUT"]
+
+slope = processing.run("native:slope", {
+    "INPUT": dem_layer,
+    "Z_FACTOR": 1.0,
+    "OUTPUT": "TEMPORARY_OUTPUT"
+})["OUTPUT"]
+```
+
+> **호환성 메모** — `native:slope`는 3.x 후반에 추가되었다.
+> 구버전 호환이 필요하면 `qgis:slope` / `gdal:slope`로 폴백한다.
+>
+> ```python
+> from qgis.core import QgsApplication
+> def find_alg(*candidates):
+>     reg = QgsApplication.processingRegistry()
+>     for alg_id in candidates:
+>         if reg.algorithmById(alg_id):
+>             return alg_id
+>     raise RuntimeError("사용 가능한 알고리즘 없음: " + ", ".join(candidates))
+>
+> slope_alg = find_alg("native:slope", "qgis:slope", "gdal:slope")
+> ```
+>
+> 이 `find_alg` 패턴은 3.6~4.x 전 구간 호환의 실무 표준으로,
+> 본 교재의 모든 프로젝트 코드에서 사용한다.
+
+---
+
+# Chapter 7. Processing Framework
+
+## 7.1 왜 GUI 플러그인보다 Processing을 우선하는가
+
+Processing Algorithm으로 구현하면 다음을 공짜로 얻는다.
+
+- 표준 파라미터 UI 자동 생성
+- **일괄 처리(Batch)** — 대안노선 10개 동시 평가
+- **모델 디자이너** — 비개발자도 알고리즘 체인 구성
+- `qgis_process` CLI — 서버 자동화
+- Processing 이력 — 재현성
+
+본 교재의 전략: **분석 엔진은 Processing Algorithm으로, 
+업무 흐름과 보고서는 GUI(DockWidget)로** 구현한다.
+
+## 7.2 QgsProcessingAlgorithm 골격
+
+```python
+from qgis.PyQt.QtCore import QCoreApplication
+from qgis.core import (QgsProcessingAlgorithm,
+                       QgsProcessingParameterFeatureSource,
+                       QgsProcessingParameterNumber,
+                       QgsProcessingParameterFeatureSink,
+                       QgsProcessing, QgsFeatureSink)
+
+
+class SurveyBufferAlgorithm(QgsProcessingAlgorithm):
+    INPUT = "INPUT"
+    RADIUS = "RADIUS"
+    OUTPUT = "OUTPUT"
+
+    def tr(self, s):
+        return QCoreApplication.translate("SurveyBuffer", s)
+
+    def createInstance(self):
+        return SurveyBufferAlgorithm()
+
+    def name(self):
+        return "surveybuffer"
+
+    def displayName(self):
+        return self.tr("조사반경 생성")
+
+    def group(self):
+        return self.tr("기초조사")
+
+    def groupId(self):
+        return "sitesurvey"
+
+    def shortHelpString(self):
+        return self.tr("사업지 경계로부터 지정 반경의 조사구역을 생성합니다.")
+
+    def initAlgorithm(self, config=None):
+        self.addParameter(QgsProcessingParameterFeatureSource(
+            self.INPUT, self.tr("사업지 경계"),
+            [QgsProcessing.TypeVectorPolygon]))
+        self.addParameter(QgsProcessingParameterNumber(
+            self.RADIUS, self.tr("조사반경 (m)"),
+            QgsProcessingParameterNumber.Double, 500.0, minValue=0.0))
+        self.addParameter(QgsProcessingParameterFeatureSink(
+            self.OUTPUT, self.tr("조사구역")))
+
+    def processAlgorithm(self, parameters, context, feedback):
+        source = self.parameterAsSource(parameters, self.INPUT, context)
+        radius = self.parameterAsDouble(parameters, self.RADIUS, context)
+
+        sink, dest_id = self.parameterAsSink(
+            parameters, self.OUTPUT, context,
+            source.fields(), source.wkbType(), source.sourceCrs())
+
+        total = 100.0 / max(source.featureCount(), 1)
+        for i, feat in enumerate(source.getFeatures()):
+            if feedback.isCanceled():
+                break
+            g = feat.geometry().buffer(radius, 24)
+            feat.setGeometry(g)
+            sink.addFeature(feat, QgsFeatureSink.FastInsert)
+            feedback.setProgress(int(i * total))
+
+        return {self.OUTPUT: dest_id}
+```
+
+## 7.3 Provider 등록
+
+```python
+from qgis.core import QgsProcessingProvider
+from qgis.PyQt.QtGui import QIcon
+import os
+
+
+class EngineeringProvider(QgsProcessingProvider):
+
+    def id(self):
+        return "engineering"
+
+    def name(self):
+        return "설계엔지니어링 도구"
+
+    def icon(self):
+        return QIcon(os.path.join(os.path.dirname(__file__), "..", "icon.svg"))
+
+    def loadAlgorithms(self):
+        from .survey_buffer import SurveyBufferAlgorithm
+        from .site_suitability import SiteSuitabilityAlgorithm
+        from .eia_screening import EiaScreeningAlgorithm
+        for alg in (SurveyBufferAlgorithm(),
+                    SiteSuitabilityAlgorithm(),
+                    EiaScreeningAlgorithm()):
+            self.addAlgorithm(alg)
+```
+
+플러그인 본체에서:
+
+```python
+from qgis.core import QgsApplication
+
+def initProcessing(self):
+    self.provider = EngineeringProvider()
+    QgsApplication.processingRegistry().addProvider(self.provider)
+
+def unload(self):
+    QgsApplication.processingRegistry().removeProvider(self.provider)
+```
+
+---
+
+# Chapter 8. UI 개발 — DockWidget과 QGIS 전용 위젯
+
+## 8.1 QGIS 전용 위젯을 쓰는 이유
+
+`qgis.gui`의 위젯은 프로젝트 레이어 목록·좌표계 선택 등을 자동 처리한다.
+
+| 위젯 | 용도 |
+|---|---|
+| `QgsMapLayerComboBox` | 레이어 선택 (타입 필터 가능) |
+| `QgsFieldComboBox` | 선택 레이어의 필드 선택 |
+| `QgsProjectionSelectionWidget` | 좌표계 선택 |
+| `QgsFileWidget` | 파일/폴더 선택 |
+| `QgsDoubleSpinBox` | 수치 입력 |
+| `QgsCollapsibleGroupBox` | 접이식 그룹 |
+
+```python
+from qgis.gui import QgsMapLayerComboBox
+from qgis.core import QgsMapLayerProxyModel
+
+self.cbo_site = QgsMapLayerComboBox()
+self.cbo_site.setFilters(QgsMapLayerProxyModel.PolygonLayer)
+self.cbo_dem = QgsMapLayerComboBox()
+self.cbo_dem.setFilters(QgsMapLayerProxyModel.RasterLayer)
+```
+
+> **호환성 메모** — QGIS 3.34+에서는 `Qgis.LayerFilter` 기반 새 API가 도입되었고
+> `QgsMapLayerProxyModel.PolygonLayer` 상수는 구버전 호환용으로 유지된다.
+> 3.6~4.x 전 구간에서는 위 형태가 안전하다. 4.x 전용 코드로 전환할 때
+> compat.py에 상수 매핑을 추가한다.
+
+## 8.2 코드 기반 DockWidget (교재 표준)
+
+.ui 파일 + uic 로딩도 가능하지만, 본 교재는 **코드 기반 UI**를 표준으로 한다.
+버전 간 uic 동작 차이를 피하고, 코드 리뷰·diff가 쉬워진다.
+
+```python
+from qgis.PyQt.QtCore import Qt
+from qgis.PyQt.QtWidgets import (QDockWidget, QWidget, QVBoxLayout,
+                                 QFormLayout, QPushButton, QDoubleSpinBox,
+                                 QProgressBar, QTextEdit)
+from qgis.gui import QgsMapLayerComboBox
+from qgis.core import QgsMapLayerProxyModel
+
+
+class SurveyDockWidget(QDockWidget):
+
+    def __init__(self, iface, parent=None):
+        super().__init__("기초조사", parent)
+        self.iface = iface
+        self.setObjectName("SiteSurveyorDock")
+        self._build_ui()
+
+    def _build_ui(self):
+        body = QWidget()
+        layout = QVBoxLayout(body)
+
+        form = QFormLayout()
+        self.cbo_site = QgsMapLayerComboBox()
+        self.cbo_site.setFilters(QgsMapLayerProxyModel.PolygonLayer)
+        form.addRow("사업지 경계", self.cbo_site)
+
+        self.spin_radius = QDoubleSpinBox()
+        self.spin_radius.setRange(0, 100000)
+        self.spin_radius.setValue(500)
+        self.spin_radius.setSuffix(" m")
+        form.addRow("조사반경", self.spin_radius)
+        layout.addLayout(form)
+
+        self.btn_run = QPushButton("조사 실행")
+        layout.addWidget(self.btn_run)
+
+        self.progress = QProgressBar()
+        self.progress.setVisible(False)
+        layout.addWidget(self.progress)
+
+        self.txt_log = QTextEdit()
+        self.txt_log.setReadOnly(True)
+        layout.addWidget(self.txt_log)
+
+        self.setWidget(body)
+
+
+# 플러그인 본체에서
+# self.dock = SurveyDockWidget(self.iface)
+# self.iface.addDockWidget(Qt.DockWidgetArea.RightDockWidgetArea, self.dock)
+```
+
+`Qt.DockWidgetArea.RightDockWidgetArea` — 완전수식 enum 규칙이 여기서도 적용된다.
+
+---
+
+# Chapter 9. QgsTask — 대용량 데이터의 백그라운드 처리
+
+## 9.1 UI 프리즈 문제
+
+전국 연속지적도 클리핑을 메인 스레드에서 돌리면 QGIS 전체가 멈춘다.
+장시간 분석은 `QgsTask`로 백그라운드 실행한다.
+
+## 9.2 절대 규칙
+
+> **WARNING** — 백그라운드 스레드에서 다음을 하면 안 된다.
+> - GUI 위젯 접근/수정
+> - `iface` 사용
+> - 캔버스에 레이어 추가
+> - 프로젝트에 등록된 레이어 객체 직접 편집
+>
+> 스레드에서는 **계산만** 하고, 결과 반영은 `finished()`(메인 스레드)에서 한다.
+
+## 9.3 표준 패턴
+
+```python
+from qgis.core import QgsTask, QgsApplication, QgsMessageLog, Qgis
+
+
+class SurveyTask(QgsTask):
+
+    def __init__(self, desc, site_geom, layers, radius, on_done):
+        super().__init__(desc, QgsTask.CanCancel)
+        self.site_geom = site_geom
+        self.layers = layers          # 스레드 안전을 위해 소스 경로/클론 전달
+        self.radius = radius
+        self.on_done = on_done
+        self.result_rows = []
+        self.exception = None
+
+    def run(self):
+        """워커 스레드. True/False 반환."""
+        try:
+            n = len(self.layers)
+            for i, (name, layer) in enumerate(self.layers):
+                if self.isCanceled():
+                    return False
+                self.result_rows.extend(self._analyze(name, layer))
+                self.setProgress(100.0 * (i + 1) / n)
+            return True
+        except Exception as e:                      # 스레드 예외는 삼켜지므로 보관
+            self.exception = e
+            return False
+
+    def _analyze(self, name, layer):
+        ...  # 순수 계산
+
+    def finished(self, ok):
+        """메인 스레드. GUI 반영은 여기서만."""
+        if ok:
+            self.on_done(self.result_rows)
+        elif self.exception:
+            QgsMessageLog.logMessage(
+                f"조사 실패: {self.exception}", "SiteSurveyor",
+                Qgis.MessageLevel.Critical)
+
+# 실행
+task = SurveyTask("기초조사", site_geom, layers, 500, self.show_result)
+QgsApplication.taskManager().addTask(task)
+```
+
+> **TIP** — 워커에 넘기는 벡터 레이어는 `layer.clone()` 또는
+> 소스 문자열로 재오픈하여 전달하면 스레드 충돌을 예방할 수 있다.
+> `run()` 안의 예외는 반드시 잡아서 `finished()`로 전달한다 —
+> 그렇지 않으면 실패 원인을 알 수 없는 "조용한 실패"가 된다.
+
+---
+
+# Chapter 10. 보고서 자동 출력
+
+## 10.1 두 가지 경로
+
+| 경로 | 장점 | 용도 |
+|---|---|---|
+| **HTML → 인쇄/PDF** | 구현 단순, 표 스타일 자유 | 조사 현황표, 스크리닝 결과표 |
+| **QgsLayout(조판)** | 지도+표+범례 정식 도면 | 성과품 도면 |
+
+## 10.2 HTML 보고서 (교재 기본)
+
+```python
+import datetime
+
+REPORT_CSS = """
+body { font-family: 'Malgun Gothic', sans-serif; margin: 24px; }
+h1 { border-bottom: 2px solid #2c3e50; padding-bottom: 6px; }
+table { border-collapse: collapse; width: 100%; margin: 12px 0; }
+th, td { border: 1px solid #999; padding: 6px 10px; font-size: 10pt; }
+th { background: #eef2f7; }
+td.num { text-align: right; }
+.warn { color: #c0392b; font-weight: bold; }
+"""
+
+def build_report_html(title, meta_rows, table_head, table_rows):
+    def tr_meta(k, v):
+        return f"<tr><th style='width:160px'>{k}</th><td>{v}</td></tr>"
+
+    head_html = "".join(f"<th>{h}</th>" for h in table_head)
+    body_html = ""
+    for row in table_rows:
+        tds = "".join(
+            f"<td class='num'>{c:,.1f}</td>" if isinstance(c, float)
+            else f"<td>{c}</td>" for c in row)
+        body_html += f"<tr>{tds}</tr>"
+
+    return f"""<!DOCTYPE html><html><head><meta charset="utf-8">
+<style>{REPORT_CSS}</style></head><body>
+<h1>{title}</h1>
+<table>{"".join(tr_meta(k, v) for k, v in meta_rows)}</table>
+<table><thead><tr>{head_html}</tr></thead><tbody>{body_html}</tbody></table>
+<p style="color:#888">작성일시: {datetime.datetime.now():%Y-%m-%d %H:%M} ·
+QGIS Site Surveyor 자동 생성</p>
+</body></html>"""
+```
+
+## 10.3 QgsLayout으로 지도 도면 생성 (요약)
+
+```python
+from qgis.core import (QgsProject, QgsPrintLayout, QgsLayoutItemMap,
+                       QgsLayoutItemLabel, QgsLayoutExporter,
+                       QgsLayoutPoint, QgsLayoutSize, QgsUnitTypes)
+
+def export_map_pdf(extent, out_pdf, title="기초조사 위치도"):
+    project = QgsProject.instance()
+    layout = QgsPrintLayout(project)
+    layout.initializeDefaults()          # A4 가로 기본
+
+    item_map = QgsLayoutItemMap(layout)
+    item_map.attemptMove(QgsLayoutPoint(10, 25, QgsUnitTypes.LayoutMillimeters))
+    item_map.attemptResize(QgsLayoutSize(277, 165, QgsUnitTypes.LayoutMillimeters))
+    item_map.setExtent(extent)
+    layout.addLayoutItem(item_map)
+
+    label = QgsLayoutItemLabel(layout)
+    label.setText(title)
+    label.adjustSizeToText()
+    label.attemptMove(QgsLayoutPoint(10, 8, QgsUnitTypes.LayoutMillimeters))
+    layout.addLayoutItem(label)
+
+    exporter = QgsLayoutExporter(layout)
+    exporter.exportToPdf(out_pdf, QgsLayoutExporter.PdfExportSettings())
+```
+
+---
+---
+
+# Part III. 실전 프로젝트 1 — 기초조사 플러그인 (SiteSurveyor)
+
+---
+
+# Chapter 11. 요구사항 정의와 아키텍처
+
+## 11.1 업무 시나리오
+
+> 도로 실시설계 착수. 사업노선 중심선으로부터 500m 조사구역을 설정하고,
+> 구역 내 ①행정구역별 편입 현황 ②지목별 필지수·면적 ③토지피복 현황
+> ④보호구역 저촉 여부를 표로 정리해 기초조사 보고서 초안을 만든다.
+> 지금까지는 담당자가 레이어별로 클리핑 → 속성 내보내기 → 엑셀 피벗을
+> 반복했다. 노선 대안이 바뀔 때마다 반나절이 사라진다.
+
+## 11.2 기능 요구사항
+
+| ID | 기능 | 비고 |
+|---|---|---|
+| F1 | 사업지 입력: 폴리곤 레이어 선택 또는 선형(중심선) + 폭 | 도로/철도는 선형 |
+| F2 | 조사반경 버퍼 생성 (다중 반경: 예 300/500/1000m) | 영향권 구분 |
+| F3 | 조사 대상 레이어 등록 (레이어 + 집계 필드 + 집계 방식) | 사용자 구성 |
+| F4 | 레이어별 클리핑 결과를 GeoPackage로 일괄 저장 | 성과품 |
+| F5 | 항목별 집계표 (건수/면적/연장, 반경별) | 핵심 |
+| F6 | HTML 조사 보고서 + 위치도 PDF | 산출물 |
+| F7 | 백그라운드 실행 + 진행률 + 취소 | QgsTask |
+
+## 11.3 아키텍처
+
+```text
+site_surveyor/
+├── __init__.py
+├── metadata.txt
+├── compat.py
+├── plugin.py                # 진입점: 독위젯 + Provider 등록
+├── gui/
+│   ├── dock_widget.py       # 메인 UI
+│   └── layer_config_dialog.py
+├── core/
+│   ├── survey_engine.py     # ★ 분석 엔진 (GUI 비의존)
+│   ├── report_builder.py    # HTML 보고서
+│   └── models.py            # SurveyItem, SurveyResult 데이터클래스
+├── processing/
+│   ├── provider.py
+│   └── survey_algorithm.py  # 엔진을 Processing으로도 노출
+└── tests/
+    └── test_survey_engine.py
+```
+
+> **ENGINEERING PRACTICE** — `survey_engine.py`는 iface를 모른다.
+> 입력(지오메트리, 레이어 목록, 설정) → 출력(결과 데이터클래스)의 순수 함수 집합으로
+> 만들면, GUI·Processing·테스트 세 곳에서 동일 엔진을 재사용한다.
+
+---
+
+# Chapter 12~13. 핵심 구현 해설
+
+## 12.1 데이터 모델 (`core/models.py`)
+
+```python
+from dataclasses import dataclass, field
+from typing import List, Optional
+
+
+@dataclass
+class SurveyItem:
+    """조사 대상 레이어 1건의 구성."""
+    name: str                 # 표기명 (예: "연속지적도")
+    layer_source: str         # 소스 문자열 (스레드에서 재오픈)
+    provider: str             # "ogr" 등
+    group_field: Optional[str]  # 분류 필드 (예: "지목") — 없으면 전체 집계
+    geom_kind: str            # "polygon" | "line" | "point"
+
+
+@dataclass
+class SurveyRow:
+    layer_name: str
+    ring_label: str           # "0~300m" 등
+    category: str             # 분류값 (지목 등)
+    count: int
+    measure: float            # 면적(m2) 또는 연장(m), 점이면 0
+
+
+@dataclass
+class SurveyResult:
+    site_area_m2: float
+    rows: List[SurveyRow] = field(default_factory=list)
+    warnings: List[str] = field(default_factory=list)
+```
+
+## 12.2 분석 엔진 (`core/survey_engine.py`)
+
+```python
+"""기초조사 엔진 — GUI 비의존, QgsTask.run()에서 호출 가능."""
+from typing import Callable, List, Optional
+from qgis.core import (QgsVectorLayer, QgsGeometry, QgsFeatureRequest,
+                       QgsCoordinateReferenceSystem, QgsCoordinateTransform,
+                       QgsProject)
+from .models import SurveyItem, SurveyRow, SurveyResult
+
+
+def build_rings(site_geom: QgsGeometry, radii: List[float]):
+    """다중 반경 도넛(링) 생성. radii 예: [300, 500, 1000]"""
+    rings = []
+    prev = site_geom
+    prev_label = 0
+    for r in sorted(radii):
+        buf = site_geom.buffer(r, 24)
+        ring = buf.difference(prev)
+        rings.append((f"{prev_label}~{int(r)}m", ring))
+        prev, prev_label = buf, int(r)
+    # 사업지 자체(0m, 직접편입)를 맨 앞에
+    rings.insert(0, ("직접편입", site_geom))
+    return rings
+
+
+def _reproject(geom: QgsGeometry, src: QgsCoordinateReferenceSystem,
+               dst: QgsCoordinateReferenceSystem) -> QgsGeometry:
+    if src == dst:
+        return geom
+    tr = QgsCoordinateTransform(src, dst, QgsProject.instance())
+    g = QgsGeometry(geom)
+    g.transform(tr)
+    return g
+
+
+def analyze_item(item: SurveyItem,
+                 rings,
+                 work_crs: QgsCoordinateReferenceSystem,
+                 is_canceled: Callable[[], bool] = lambda: False
+                 ) -> List[SurveyRow]:
+    """레이어 1건 × 링 전체 집계."""
+    layer = QgsVectorLayer(item.layer_source, item.name, item.provider)
+    if not layer.isValid():
+        raise RuntimeError(f"레이어 열기 실패: {item.name}")
+
+    rows = {}
+    for ring_label, ring_geom in rings:
+        # 링 지오메트리를 레이어 CRS로 변환하여 BBox 필터
+        ring_in_layer = _reproject(ring_geom, work_crs, layer.crs())
+
+        req = QgsFeatureRequest().setFilterRect(ring_in_layer.boundingBox())
+        if item.group_field:
+            req.setSubsetOfAttributes([item.group_field], layer.fields())
+        else:
+            req.setSubsetOfAttributes([])
+
+        for f in layer.getFeatures(req):
+            if is_canceled():
+                return []
+            fg = f.geometry()
+            if fg is None or fg.isEmpty():
+                continue
+            if not fg.intersects(ring_in_layer):
+                continue
+
+            inter = fg.intersection(ring_in_layer)
+            if inter.isEmpty():
+                continue
+
+            # 측정은 작업좌표계(투영)에서
+            inter_w = _reproject(inter, layer.crs(), work_crs)
+            if item.geom_kind == "polygon":
+                measure = inter_w.area()
+            elif item.geom_kind == "line":
+                measure = inter_w.length()
+            else:
+                measure = 0.0
+
+            cat = str(f[item.group_field]) if item.group_field else "전체"
+            key = (ring_label, cat)
+            if key not in rows:
+                rows[key] = SurveyRow(item.name, ring_label, cat, 0, 0.0)
+            rows[key].count += 1
+            rows[key].measure += measure
+
+    return sorted(rows.values(),
+                  key=lambda r: (r.ring_label, -r.measure))
+
+
+def run_survey(site_geom: QgsGeometry,
+               work_crs: QgsCoordinateReferenceSystem,
+               radii: List[float],
+               items: List[SurveyItem],
+               progress: Callable[[float], None] = lambda p: None,
+               is_canceled: Callable[[], bool] = lambda: False
+               ) -> SurveyResult:
+    result = SurveyResult(site_area_m2=site_geom.area())
+    rings = build_rings(site_geom, radii)
+    n = max(len(items), 1)
+    for i, item in enumerate(items):
+        if is_canceled():
+            break
+        try:
+            result.rows.extend(analyze_item(item, rings, work_crs, is_canceled))
+        except Exception as e:
+            result.warnings.append(f"{item.name}: {e}")
+        progress(100.0 * (i + 1) / n)
+    return result
+```
+
+이 엔진의 설계 포인트:
+
+1. **레이어를 소스 문자열로 받아 스레드 안에서 재오픈** — 스레드 안전
+2. **BBox 필터 → 정밀 intersects → intersection** 3단계 — 대용량 성능
+3. **측정은 작업 투영좌표계에서** — 면적·연장 정확도
+4. `progress` / `is_canceled` 콜백 주입 — QgsTask · Processing feedback 양쪽 호환
+
+## 13.1 집계표 → 보고서
+
+```python
+# core/report_builder.py
+from .models import SurveyResult
+from collections import defaultdict
+
+
+def result_to_table(result: SurveyResult):
+    head = ["레이어", "구간", "분류", "건수", "면적/연장"]
+    rows = []
+    for r in result.rows:
+        rows.append([r.layer_name, r.ring_label, r.category,
+                     r.count, round(r.measure, 1)])
+    return head, rows
+
+
+def summarize_by_layer(result: SurveyResult):
+    agg = defaultdict(lambda: [0, 0.0])
+    for r in result.rows:
+        agg[r.layer_name][0] += r.count
+        agg[r.layer_name][1] += r.measure
+    return agg
+```
+
+HTML 생성은 Chapter 10의 `build_report_html`을 그대로 사용한다.
+
+---
+
+# Chapter 14. SiteSurveyor 통합 — 플러그인 본체와 Task 연결
+
+```python
+# plugin.py (발췌)
+from qgis.PyQt.QtCore import Qt
+from qgis.core import (QgsApplication, QgsTask, QgsProject,
+                       QgsCoordinateReferenceSystem)
+from .gui.dock_widget import SurveyDockWidget
+from .core import survey_engine
+from .core.models import SurveyItem
+from .core.report_builder import result_to_table
+from .processing.provider import EngineeringProvider
+
+
+class _SurveyTask(QgsTask):
+    def __init__(self, site_geom, work_crs, radii, items, on_done):
+        super().__init__("기초조사 실행", QgsTask.CanCancel)
+        self.args = (site_geom, work_crs, radii, items)
+        self.on_done = on_done
+        self.result = None
+        self.exception = None
+
+    def run(self):
+        try:
+            self.result = survey_engine.run_survey(
+                *self.args,
+                progress=self.setProgress,
+                is_canceled=self.isCanceled)
+            return not self.isCanceled()
+        except Exception as e:
+            self.exception = e
+            return False
+
+    def finished(self, ok):
+        self.on_done(ok, self.result, self.exception)
+
+
+class SiteSurveyorPlugin:
+
+    def __init__(self, iface):
+        self.iface = iface
+        self.dock = None
+        self.provider = None
+        self._task = None            # ★ 참조 유지 필수
+
+    def initGui(self):
+        self.provider = EngineeringProvider()
+        QgsApplication.processingRegistry().addProvider(self.provider)
+
+        self.dock = SurveyDockWidget(self.iface)
+        self.dock.btn_run.clicked.connect(self.start_survey)
+        self.iface.addDockWidget(
+            Qt.DockWidgetArea.RightDockWidgetArea, self.dock)
+
+    def unload(self):
+        if self.provider:
+            QgsApplication.processingRegistry().removeProvider(self.provider)
+        if self.dock:
+            self.iface.removeDockWidget(self.dock)
+            self.dock.deleteLater()
+
+    def start_survey(self):
+        site_layer = self.dock.cbo_site.currentLayer()
+        if site_layer is None or site_layer.featureCount() == 0:
+            self.iface.messageBar().pushWarning("기초조사", "사업지 레이어를 선택하세요.")
+            return
+
+        # 사업지 병합 지오메트리
+        geoms = [f.geometry() for f in site_layer.getFeatures()]
+        site_geom = geoms[0]
+        for g in geoms[1:]:
+            site_geom = site_geom.combine(g)
+
+        work_crs = site_layer.crs()
+        if work_crs.isGeographic():
+            work_crs = QgsCoordinateReferenceSystem("EPSG:5186")
+            self.iface.messageBar().pushInfo(
+                "기초조사", "지리좌표계 입력 → EPSG:5186으로 변환하여 집계합니다.")
+            # 실무에서는 사업지 경도 기반 원점 자동 선택 로직을 넣는다 (연습문제)
+
+        items = self.dock.collect_items()   # 사용자가 등록한 SurveyItem 목록
+        radii = self.dock.collect_radii()   # 예: [300, 500, 1000]
+
+        self.dock.progress.setVisible(True)
+        self._task = _SurveyTask(site_geom, work_crs, radii, items,
+                                 self.on_survey_done)
+        self._task.progressChanged.connect(
+            lambda p: self.dock.progress.setValue(int(p)))
+        QgsApplication.taskManager().addTask(self._task)
+
+    def on_survey_done(self, ok, result, exc):
+        self.dock.progress.setVisible(False)
+        if not ok:
+            msg = f"조사 실패: {exc}" if exc else "사용자 취소"
+            self.iface.messageBar().pushCritical("기초조사", msg)
+            return
+        head, rows = result_to_table(result)
+        self.dock.show_result_table(head, rows)
+        for w in result.warnings:
+            self.dock.txt_log.append("⚠ " + w)
+        self.iface.messageBar().pushSuccess(
+            "기초조사", f"완료 — 집계 {len(rows)}건")
+```
+
+> **WARNING** — `self._task`처럼 Task 참조를 멤버로 보관하지 않으면
+> 가비지 컬렉션으로 Task가 도중에 사라지는 고전적 버그가 발생한다.
+
+## 14.1 연습문제
+
+1. 사업지 경도(중앙 경도)에 따라 EPSG 5185/5186/5187을 자동 선택하는
+   `pick_korea_tm(geom)` 함수를 작성하라.
+2. F4(클리핑 결과 GeoPackage 저장)를 `processing.run("native:clip", ...)` +
+   `QgsVectorFileWriter`로 구현하라.
+3. 선형 사업지(중심선) 입력 시 "폭 w의 사업구역 폴리곤"을 생성하는
+   전처리 단계를 추가하라. (`buffer(w/2, cap=flat)` 활용)
+
+---
+---
+
+# Part IV. 실전 프로젝트 2 — 입지선정 플러그인 (SiteSelector)
+
+---
+
+# Chapter 15. MCDA 이론 — 실무자를 위한 최소 수학
+
+## 15.1 가중 선형 결합 (WLC, Weighted Linear Combination)
+
+입지 적합도의 표준 모형:
+
+```text
+S = Σ ( wᵢ × xᵢ ) × Π cⱼ
+
+wᵢ : 기준 i의 가중치 (Σwᵢ = 1)
+xᵢ : 기준 i의 표준화 점수 (0~1)
+cⱼ : 제약 j (부적지=0, 가능지=1) — 곱해서 절대 배제
+```
+
+## 15.2 기준 표준화 두 방식
+
+| 방식 | 수식 | 예 |
+|---|---|---|
+| 편익형(클수록 좋음) | x = (v − min) / (max − min) | 도로 접근성 |
+| 비용형(작을수록 좋음) | x = (max − v) / (max − min) | 경사, 공사비 |
+
+경사도처럼 임계값이 있는 기준은 구간 재분류(1~5등급)를 병용한다.
+
+## 15.3 AHP 가중치 — 쌍대비교와 일관성
+
+전문가가 기준을 두 개씩 비교(1~9 척도)한 행렬 A에서:
+
+1. 각 열을 합으로 나눠 정규화
+2. 행 평균 → 가중치 벡터 w
+3. λmax ≈ 평균( (A·w)ᵢ / wᵢ )
+4. CI = (λmax − n) / (n − 1),  CR = CI / RI(n)
+5. **CR < 0.1 이면 일관성 인정**
+
+```python
+# core/ahp.py — 외부 라이브러리 없이 순수 파이썬 구현
+RI_TABLE = {1: 0.0, 2: 0.0, 3: 0.58, 4: 0.90, 5: 1.12,
+            6: 1.24, 7: 1.32, 8: 1.41, 9: 1.45, 10: 1.49}
+
+
+def ahp_weights(matrix):
+    """matrix: n×n 쌍대비교 리스트. 반환: (weights, CR)"""
+    n = len(matrix)
+    col_sum = [sum(matrix[r][c] for r in range(n)) for c in range(n)]
+    norm = [[matrix[r][c] / col_sum[c] for c in range(n)] for r in range(n)]
+    w = [sum(norm[r]) / n for r in range(n)]
+
+    aw = [sum(matrix[r][c] * w[c] for c in range(n)) for r in range(n)]
+    lam = sum(aw[r] / w[r] for r in range(n)) / n
+    ci = (lam - n) / (n - 1) if n > 1 else 0.0
+    cr = ci / RI_TABLE[n] if RI_TABLE.get(n) else 0.0
+    return w, cr
+```
+
+> **ENGINEERING PRACTICE** — CR ≥ 0.1이면 결과를 쓰지 말고
+> 비교 행렬을 재검토하도록 UI에서 강제(경고+실행차단)한다.
+> 심의·인허가 문서에 들어가는 수치이기 때문이다.
+
+## 15.4 분야별 기준 예시
+
+| 분야 | 편익 기준 | 비용 기준 | 제약(배제) |
+|---|---|---|---|
+| 도로 노선대 | 기존도로 연계성 | 경사, 절성토량, 교량·터널 연장 | 상수원보호구역, 문화재보호구역 |
+| 정수장/취수장 | 취수원 근접, 부지 평탄성 | 표고(양정), 민가 근접 | 침수위험지, 생태1등급 |
+| 철도 정거장 | 인구밀도, 환승연계 | 경사, 지가 | 공원구역, 급경사지 |
+| 도시개발 | 기반시설 접근성 | 경사, 임상도 등급 | 개발제한구역, 농업진흥지역 |
+
+---
+
+# Chapter 16~18. SiteSelector 구현 — Processing Algorithm 전체 코드
+
+입지선정 엔진은 배치 실행(대안 다중 평가)과 모델 디자이너 연계가 중요하므로
+**Processing Algorithm으로 구현**한다.
+
+```python
+# processing/site_suitability.py
+"""
+가중중첩 입지 적합도 알고리즘 (QGIS 3.6~4.x)
+
+입력:
+  - 기준 래스터 N개 (동일 CRS 권장, 해상도 상이 허용 — 기준 셀로 리샘플)
+  - 각 기준의 방향(편익/비용)과 가중치
+  - 제약 폴리곤(배제지역, 선택)
+출력:
+  - 0~1 적합도 래스터
+"""
+from qgis.PyQt.QtCore import QCoreApplication
+from qgis.core import (QgsProcessingAlgorithm, QgsProcessing,
+                       QgsProcessingParameterMultipleLayers,
+                       QgsProcessingParameterString,
+                       QgsProcessingParameterVectorLayer,
+                       QgsProcessingParameterRasterDestination,
+                       QgsProcessingException,
+                       QgsApplication)
+import processing
+
+
+def tr(s):
+    return QCoreApplication.translate("SiteSuitability", s)
+
+
+def find_alg(*candidates):
+    reg = QgsApplication.processingRegistry()
+    for a in candidates:
+        if reg.algorithmById(a):
+            return a
+    raise QgsProcessingException(tr("알고리즘 없음: ") + ", ".join(candidates))
+
+
+class SiteSuitabilityAlgorithm(QgsProcessingAlgorithm):
+    CRITERIA = "CRITERIA"
+    WEIGHTS = "WEIGHTS"       # "0.4,0.3,0.3" 형식
+    DIRECTIONS = "DIRECTIONS" # "cost,benefit,benefit" 형식
+    CONSTRAINT = "CONSTRAINT"
+    OUTPUT = "OUTPUT"
+
+    def createInstance(self):
+        return SiteSuitabilityAlgorithm()
+
+    def name(self):
+        return "sitesuitability"
+
+    def displayName(self):
+        return tr("입지 적합도 (가중중첩)")
+
+    def group(self):
+        return tr("입지선정")
+
+    def groupId(self):
+        return "siteselection"
+
+    def shortHelpString(self):
+        return tr(
+            "기준 래스터들을 0~1로 표준화한 뒤 가중합산하여 적합도를 계산합니다.\n"
+            "WEIGHTS와 DIRECTIONS는 기준 레이어 순서와 동일한 콤마 구분 목록입니다.\n"
+            "DIRECTIONS: benefit(클수록 적합) 또는 cost(작을수록 적합).\n"
+            "제약 폴리곤 입력 시 해당 지역 적합도는 0이 됩니다.")
+
+    def initAlgorithm(self, config=None):
+        self.addParameter(QgsProcessingParameterMultipleLayers(
+            self.CRITERIA, tr("기준 래스터 목록"),
+            QgsProcessing.TypeRaster))
+        self.addParameter(QgsProcessingParameterString(
+            self.WEIGHTS, tr("가중치 (콤마 구분, 합=1)"), "0.5,0.5"))
+        self.addParameter(QgsProcessingParameterString(
+            self.DIRECTIONS, tr("방향 (benefit|cost, 콤마 구분)"),
+            "benefit,benefit"))
+        self.addParameter(QgsProcessingParameterVectorLayer(
+            self.CONSTRAINT, tr("제약(배제) 폴리곤"),
+            [QgsProcessing.TypeVectorPolygon], optional=True))
+        self.addParameter(QgsProcessingParameterRasterDestination(
+            self.OUTPUT, tr("적합도 래스터")))
+
+    # ---------- 내부 유틸 ----------
+
+    def _minmax(self, rlayer):
+        """band1 min/max — 3.6 호환을 위해 provider 통계 사용."""
+        stats = rlayer.dataProvider().bandStatistics(1)
+        return stats.minimumValue, stats.maximumValue
+
+    def _normalize(self, rlayer, direction, context, feedback):
+        vmin, vmax = self._minmax(rlayer)
+        if vmax - vmin == 0:
+            raise QgsProcessingException(
+                tr("상수 래스터는 표준화할 수 없습니다: ") + rlayer.name())
+        calc = find_alg("qgis:rastercalculator", "native:rastercalc")
+        ref = f'"{rlayer.name()}@1"'
+        if direction == "benefit":
+            expr = f"({ref} - {vmin}) / ({vmax} - {vmin})"
+        else:
+            expr = f"({vmax} - {ref}) / ({vmax} - {vmin})"
+        return processing.run(calc, {
+            "EXPRESSION": expr,
+            "LAYERS": [rlayer],
+            "OUTPUT": "TEMPORARY_OUTPUT"
+        }, context=context, feedback=feedback,
+           is_child_algorithm=True)["OUTPUT"]
+
+    # ---------- 본체 ----------
+
+    def processAlgorithm(self, parameters, context, feedback):
+        rasters = self.parameterAsLayerList(parameters, self.CRITERIA, context)
+        weights = [float(x) for x in
+                   self.parameterAsString(parameters, self.WEIGHTS, context).split(",")]
+        dirs = [x.strip().lower() for x in
+                self.parameterAsString(parameters, self.DIRECTIONS, context).split(",")]
+        constraint = self.parameterAsVectorLayer(parameters, self.CONSTRAINT, context)
+
+        n = len(rasters)
+        if not (len(weights) == len(dirs) == n):
+            raise QgsProcessingException(
+                tr("기준/가중치/방향 개수가 일치하지 않습니다."))
+        if abs(sum(weights) - 1.0) > 1e-6:
+            feedback.pushWarning(
+                tr(f"가중치 합이 1이 아닙니다({sum(weights):.3f}) — 정규화합니다."))
+            s = sum(weights)
+            weights = [w / s for w in weights]
+        for d in dirs:
+            if d not in ("benefit", "cost"):
+                raise QgsProcessingException(tr("방향은 benefit|cost: ") + d)
+
+        # 1) 기준별 표준화
+        norm_paths = []
+        for i, (r, d) in enumerate(zip(rasters, dirs)):
+            if feedback.isCanceled():
+                return {}
+            feedback.pushInfo(tr(f"[{i+1}/{n}] 표준화: {r.name()} ({d})"))
+            norm_paths.append(self._normalize(r, d, context, feedback))
+            feedback.setProgress(50.0 * (i + 1) / n)
+
+        # 2) 가중합산 — 표준화 래스터를 레이어로 재로드 후 계산식 구성
+        from qgis.core import QgsRasterLayer
+        norm_layers = []
+        for i, p in enumerate(norm_paths):
+            nl = QgsRasterLayer(p, f"norm_{i}")
+            if not nl.isValid():
+                raise QgsProcessingException(tr("표준화 결과 로드 실패"))
+            norm_layers.append(nl)
+
+        expr = " + ".join(
+            f'({w} * "norm_{i}@1")' for i, w in enumerate(weights))
+        calc = find_alg("qgis:rastercalculator", "native:rastercalc")
+        weighted = processing.run(calc, {
+            "EXPRESSION": expr,
+            "LAYERS": norm_layers,
+            "OUTPUT": "TEMPORARY_OUTPUT" if constraint else
+                      parameters[self.OUTPUT]
+        }, context=context, feedback=feedback,
+           is_child_algorithm=True)["OUTPUT"]
+        feedback.setProgress(80)
+
+        # 3) 제약 마스킹 (배제지역 → 0)
+        if constraint:
+            feedback.pushInfo(tr("제약지역 마스킹 적용"))
+            clip_alg = find_alg("gdal:cliprasterbymasklayer")
+            # 제약의 '반대' 영역으로 클리핑하는 대신,
+            # 제약 래스터화(내부=0, 외부=1) 후 곱하는 방식이 견고하다.
+            rasterize = find_alg("gdal:rasterize")
+            first = QgsRasterLayer(norm_paths[0], "ref")
+            ext = first.extent()
+            px = first.rasterUnitsPerPixelX()
+            mask = processing.run(rasterize, {
+                "INPUT": constraint,
+                "BURN": 0, "INIT": 1, "UNITS": 1,
+                "WIDTH": px, "HEIGHT": px,
+                "EXTENT": ext, "DATA_TYPE": 5,
+                "OUTPUT": "TEMPORARY_OUTPUT"
+            }, context=context, feedback=feedback,
+               is_child_algorithm=True)["OUTPUT"]
+
+            wlayer = QgsRasterLayer(weighted, "weighted")
+            mlayer = QgsRasterLayer(mask, "mask")
+            result = processing.run(calc, {
+                "EXPRESSION": '"weighted@1" * "mask@1"',
+                "LAYERS": [wlayer, mlayer],
+                "OUTPUT": parameters[self.OUTPUT]
+            }, context=context, feedback=feedback,
+               is_child_algorithm=True)["OUTPUT"]
+        else:
+            result = weighted
+
+        feedback.setProgress(100)
+        return {self.OUTPUT: result}
+```
+
+> **호환성 메모 (중요)** —
+> 래스터 계산기는 버전대별 알고리즘 ID·파라미터가 변해 온 대표 사례다.
+> `find_alg` 폴백 + 배포 전 3.44/4.2 양쪽 실행 테스트가 필수이며,
+> 파라미터 상세가 다르면 compat.py에 `run_raster_calc()` 래퍼를 만들어
+> 버전 분기를 한 곳에 가둔다. (연습문제 3)
+
+## 17.1 AHP 가중치 다이얼로그 (요약)
+
+`QTableWidget`으로 n×n 쌍대비교 행렬을 입력받아
+`ahp_weights()`로 계산하고 CR을 표시한다.
+
+```python
+w, cr = ahp_weights(matrix)
+self.lbl_cr.setText(f"CR = {cr:.3f}")
+if cr >= 0.1:
+    self.lbl_cr.setStyleSheet("color:#c0392b;font-weight:bold")
+    self.btn_apply.setEnabled(False)   # 일관성 미달 → 적용 차단
+else:
+    self.lbl_cr.setStyleSheet("color:#27ae60")
+    self.btn_apply.setEnabled(True)
+```
+
+계산된 가중치 문자열("0.42,0.33,0.25")을 Processing 파라미터로 넘기면
+GUI ↔ 알고리즘이 느슨하게 결합된다.
+
+## 18.1 실행 시나리오 — 도로 노선대 평가
+
+```text
+① 기준 래스터 준비
+   - slope.tif        (DEM → native:slope)           cost
+   - road_dist.tif    (도로망 → 근접 래스터)           cost
+   - env_grade.tif    (국토환경성평가 등급 래스터화)     cost
+② 제약: 상수원보호구역 ∪ 문화재보호구역 병합 폴리곤
+③ AHP: 경사 vs 접근성 vs 환경 → w = (0.32, 0.41, 0.27), CR=0.06
+④ 알고리즘 실행 → suitability.tif (0~1)
+⑤ 등급화(재분류 5단계) + 상위 등급 폴리곤화 → 후보 노선대
+```
+
+## 18.2 연습문제
+
+1. 적합도 래스터를 5등급 재분류하고(`native:reclassifybytable`)
+   1등급 지역을 폴리곤화·면적순 정렬하는 후처리 알고리즘을 작성하라.
+2. 기준 래스터의 CRS/해상도가 서로 다를 때 기준 셀 크기로 리샘플하는
+   전처리 단계(`gdal:warpreproject`)를 알고리즘에 추가하라.
+3. 사용 중인 QGIS에서 래스터 계산기 알고리즘 ID와 파라미터를 확인하고
+   (`processing.algorithmHelp("qgis:rastercalculator")`),
+   3.44와 4.2 차이를 compat.py 래퍼로 흡수하라.
+
+---
+---
+
+# Part V. 실전 프로젝트 3 — 환경영향성 평가 플러그인 (EIA Screener)
+
+---
+
+# Chapter 19. 환경영향평가 스크리닝의 GIS 로직
+
+## 19.1 업무 배경
+
+환경영향평가법 체계에서 사업자는 사업 유형·규모에 따라
+전략환경영향평가 / 환경영향평가 / 소규모 환경영향평가 대상 여부를 검토한다.
+그 사전 검토의 GIS 파트가 곧 **"보호지역·민감지역과의 공간관계 정량화"**다.
+
+> **WARNING (교재 고지)** — 본 플러그인은 **사전 스크리닝 보조 도구**다.
+> 협의 대상 여부의 최종 판단은 관련 법령·고시·협의기관 검토에 따르며,
+> 판정 기준(이격거리·면적 임계값)은 반드시 사용자가 최신 법령으로
+> 확인·설정하도록 설계한다. 기준값을 코드에 하드코딩하지 않는다.
+
+## 19.2 스크리닝 항목의 3가지 공간관계
+
+| 관계 | 산출값 | 예 |
+|---|---|---|
+| 중첩 (intersects) | 중첩면적, 사업지 대비 % | 생태자연도 1등급 중첩 |
+| 근접 (within distance) | 최단거리 | 상수원보호구역 경계로부터 거리 |
+| 포함 (contains/within) | 여부 | 사업지가 특별대책지역 내 위치 |
+
+## 19.3 검사 항목 구성 (사용자 정의 테이블)
+
+플러그인은 항목을 **설정 데이터(JSON)**로 관리한다.
+법령 개정 시 코드 수정 없이 항목·임계값만 갱신한다.
+
+```json
+{
+  "version": "2026-08",
+  "checks": [
+    {
+      "id": "eco1",
+      "name": "생태자연도 1등급",
+      "layer_hint": "생태자연도",
+      "filter": "\"등급\" = '1'",
+      "mode": "overlap",
+      "threshold": {"type": "overlap_area_m2", "value": 0},
+      "note": "중첩 시 즉시 협의검토 대상"
+    },
+    {
+      "id": "water_protect",
+      "name": "상수원보호구역",
+      "layer_hint": "상수원보호구역",
+      "filter": null,
+      "mode": "proximity",
+      "threshold": {"type": "distance_m", "value": 1000},
+      "note": "경계 1km 이내 근접 시 검토"
+    },
+    {
+      "id": "wetland",
+      "name": "습지보호지역",
+      "layer_hint": "습지보호지역",
+      "filter": null,
+      "mode": "proximity",
+      "threshold": {"type": "distance_m", "value": 500},
+      "note": ""
+    }
+  ]
+}
+```
+
+---
+
+# Chapter 20. 스크리닝 엔진 전체 코드
+
+```python
+# core/eia_engine.py
+"""환경영향 스크리닝 엔진 — GUI 비의존."""
+from dataclasses import dataclass, field
+from typing import List, Optional, Callable
+import json
+
+from qgis.core import (QgsVectorLayer, QgsGeometry, QgsFeatureRequest,
+                       QgsCoordinateReferenceSystem, QgsCoordinateTransform,
+                       QgsProject)
+
+
+@dataclass
+class EiaCheck:
+    id: str
+    name: str
+    layer_source: str
+    provider: str
+    subset_filter: Optional[str]      # QGIS 표현식/SQL where
+    mode: str                         # "overlap" | "proximity"
+    threshold_value: float
+    note: str = ""
+
+
+@dataclass
+class EiaFinding:
+    check_id: str
+    check_name: str
+    mode: str
+    overlap_area_m2: float = 0.0
+    overlap_pct: float = 0.0          # 사업지 면적 대비
+    min_distance_m: Optional[float] = None
+    hit_count: int = 0
+    triggered: bool = False           # 임계값 초과 여부
+    note: str = ""
+
+
+@dataclass
+class EiaResult:
+    site_area_m2: float
+    findings: List[EiaFinding] = field(default_factory=list)
+    warnings: List[str] = field(default_factory=list)
+
+    @property
+    def triggered_count(self):
+        return sum(1 for f in self.findings if f.triggered)
+
+
+def _to_layer_crs(geom, work_crs, layer):
+    if work_crs == layer.crs():
+        return QgsGeometry(geom)
+    tr = QgsCoordinateTransform(work_crs, layer.crs(), QgsProject.instance())
+    g = QgsGeometry(geom)
+    g.transform(tr)
+    return g
+
+
+def _to_work_crs(geom, layer, work_crs):
+    if work_crs == layer.crs():
+        return QgsGeometry(geom)
+    tr = QgsCoordinateTransform(layer.crs(), work_crs, QgsProject.instance())
+    g = QgsGeometry(geom)
+    g.transform(tr)
+    return g
+
+
+def run_check(check: EiaCheck,
+              site_geom: QgsGeometry,
+              work_crs: QgsCoordinateReferenceSystem,
+              search_radius_m: float,
+              is_canceled: Callable[[], bool] = lambda: False) -> EiaFinding:
+
+    layer = QgsVectorLayer(check.layer_source, check.name, check.provider)
+    if not layer.isValid():
+        raise RuntimeError(f"레이어 열기 실패: {check.name}")
+
+    finding = EiaFinding(check.id, check.name, check.mode, note=check.note)
+    site_area = site_geom.area()
+
+    # 검색범위: 근접검사는 max(임계, 검색반경) 버퍼 BBox
+    search_r = search_radius_m
+    if check.mode == "proximity":
+        search_r = max(search_r, check.threshold_value)
+    search_geom = site_geom.buffer(search_r, 16)
+    search_in_layer = _to_layer_crs(search_geom, work_crs, layer)
+
+    req = QgsFeatureRequest().setFilterRect(search_in_layer.boundingBox())
+    if check.subset_filter:
+        req.setFilterExpression(check.subset_filter)
+    req.setSubsetOfAttributes([])
+
+    min_dist = None
+    for f in layer.getFeatures(req):
+        if is_canceled():
+            break
+        fg = f.geometry()
+        if fg is None or fg.isEmpty():
+            continue
+
+        fg_work = _to_work_crs(fg, layer, work_crs)
+
+        if check.mode == "overlap":
+            if fg_work.intersects(site_geom):
+                inter = fg_work.intersection(site_geom)
+                if not inter.isEmpty():
+                    finding.overlap_area_m2 += inter.area()
+                    finding.hit_count += 1
+        else:  # proximity
+            d = fg_work.distance(site_geom)
+            if min_dist is None or d < min_dist:
+                min_dist = d
+            finding.hit_count += 1
+
+    if check.mode == "overlap":
+        finding.overlap_pct = (100.0 * finding.overlap_area_m2 / site_area
+                               if site_area > 0 else 0.0)
+        finding.triggered = finding.overlap_area_m2 > check.threshold_value
+    else:
+        finding.min_distance_m = min_dist
+        finding.triggered = (min_dist is not None
+                             and min_dist <= check.threshold_value)
+    return finding
+
+
+def run_screening(checks: List[EiaCheck],
+                  site_geom: QgsGeometry,
+                  work_crs: QgsCoordinateReferenceSystem,
+                  search_radius_m: float = 2000.0,
+                  progress: Callable[[float], None] = lambda p: None,
+                  is_canceled: Callable[[], bool] = lambda: False) -> EiaResult:
+    result = EiaResult(site_area_m2=site_geom.area())
+    n = max(len(checks), 1)
+    for i, c in enumerate(checks):
+        if is_canceled():
+            break
+        try:
+            result.findings.append(
+                run_check(c, site_geom, work_crs, search_radius_m, is_canceled))
+        except Exception as e:
+            result.warnings.append(f"{c.name}: {e}")
+        progress(100.0 * (i + 1) / n)
+    return result
+
+
+def load_checks_config(path, layer_bindings):
+    """JSON 설정 + {layer_hint: (source, provider)} 매핑 → EiaCheck 목록."""
+    with open(path, encoding="utf-8") as fp:
+        cfg = json.load(fp)
+    checks = []
+    for c in cfg["checks"]:
+        hint = c["layer_hint"]
+        if hint not in layer_bindings:
+            continue  # UI에서 미연결 항목은 경고 표시
+        src, prov = layer_bindings[hint]
+        checks.append(EiaCheck(
+            id=c["id"], name=c["name"],
+            layer_source=src, provider=prov,
+            subset_filter=c.get("filter"),
+            mode=c["mode"],
+            threshold_value=float(c["threshold"]["value"]),
+            note=c.get("note", "")))
+    return checks
+```
+
+---
+
+# Chapter 21. 지형영향 분석 — 경사 · 표고 · 절성토 개산
+
+도로·철도 사업의 환경 검토에는 지형훼손 규모 개산이 함께 요구된다.
+
+```python
+# core/terrain_engine.py
+import processing
+from qgis.core import QgsApplication, QgsRasterLayer
+
+
+def _find_alg(*cands):
+    reg = QgsApplication.processingRegistry()
+    for a in cands:
+        if reg.algorithmById(a):
+            return a
+    raise RuntimeError("알고리즘 없음: " + ", ".join(cands))
+
+
+def clip_dem(dem_layer, mask_layer):
+    alg = _find_alg("gdal:cliprasterbymasklayer")
+    return processing.run(alg, {
+        "INPUT": dem_layer, "MASK": mask_layer,
+        "CROP_TO_CUTLINE": True, "KEEP_RESOLUTION": True,
+        "OUTPUT": "TEMPORARY_OUTPUT"})["OUTPUT"]
+
+
+def slope_stats(dem_path_or_layer):
+    """사업지 DEM의 경사 통계: (평균, 최대, 급경사(≥25°) 비율%)"""
+    slope_alg = _find_alg("native:slope", "qgis:slope", "gdal:slope")
+    slope = processing.run(slope_alg, {
+        "INPUT": dem_path_or_layer, "Z_FACTOR": 1.0,
+        "OUTPUT": "TEMPORARY_OUTPUT"})["OUTPUT"]
+
+    rl = QgsRasterLayer(slope, "slope")
+    st = rl.dataProvider().bandStatistics(1)
+
+    # 급경사 비율: 재분류 후 unique count (버전 호환을 위해 히스토그램 대신)
+    reclass = _find_alg("native:reclassifybytable", "qgis:reclassifybytable")
+    steep = processing.run(reclass, {
+        "INPUT_RASTER": slope, "RASTER_BAND": 1,
+        "TABLE": ["0", "25", "0", "25", "90", "1"],
+        "RANGE_BOUNDARIES": 0, "NODATA_FOR_MISSING": True, "NO_DATA": -9999,
+        "OUTPUT": "TEMPORARY_OUTPUT"})["OUTPUT"]
+    srl = QgsRasterLayer(steep, "steep")
+    sstat = srl.dataProvider().bandStatistics(1)
+    steep_pct = sstat.mean * 100.0 if sstat.mean is not None else 0.0
+
+    return {"mean_deg": st.mean, "max_deg": st.maximumValue,
+            "steep_pct": steep_pct}
+
+
+def elevation_stats(dem_path_or_layer):
+    rl = (dem_path_or_layer if isinstance(dem_path_or_layer, QgsRasterLayer)
+          else QgsRasterLayer(dem_path_or_layer, "dem"))
+    st = rl.dataProvider().bandStatistics(1)
+    return {"min_m": st.minimumValue, "max_m": st.maximumValue,
+            "mean_m": st.mean}
+
+
+def cut_fill_estimate(dem_layer, site_mask, plan_elev_m):
+    """계획고 대비 절·성토량 개산 (단순 평면 계획고 모델).
+    반환: (절토량 m3, 성토량 m3) — 개산치임을 보고서에 명기."""
+    clipped = clip_dem(dem_layer, site_mask)
+    rl = QgsRasterLayer(clipped, "dem_site")
+    cell = rl.rasterUnitsPerPixelX() * rl.rasterUnitsPerPixelY()
+
+    calc = _find_alg("qgis:rastercalculator", "native:rastercalc")
+    # 절토: max(지반고-계획고, 0), 성토: max(계획고-지반고, 0)
+    cut = processing.run(calc, {
+        "EXPRESSION": f'("dem_site@1" > {plan_elev_m}) '
+                      f'* ("dem_site@1" - {plan_elev_m})',
+        "LAYERS": [rl], "OUTPUT": "TEMPORARY_OUTPUT"})["OUTPUT"]
+    fill = processing.run(calc, {
+        "EXPRESSION": f'("dem_site@1" < {plan_elev_m}) '
+                      f'* ({plan_elev_m} - "dem_site@1")',
+        "LAYERS": [rl], "OUTPUT": "TEMPORARY_OUTPUT"})["OUTPUT"]
+
+    def volume(path):
+        r = QgsRasterLayer(path, "v")
+        st = r.dataProvider().bandStatistics(1)
+        # mean × 유효셀수 × 셀면적 = 합계 × 셀면적
+        return (st.sum if hasattr(st, "sum") and st.sum
+                else st.mean * st.elementCount) * cell
+
+    return volume(cut), volume(fill)
+```
+
+> **호환성 메모** — `QgsRasterBandStats.sum` 속성 가용 여부는 버전에 따라
+> 다를 수 있어 `mean × elementCount` 폴백을 함께 둔다. 이런 "속성 존재 확인 후
+> 폴백" 패턴은 3.6~4.x 호환의 실전 기법이다.
+
+---
+
+# Chapter 22. 스크리닝 결과표와 판정 보고서
+
+```python
+# core/eia_report.py
+from .eia_engine import EiaResult
+
+
+def result_to_table(result: EiaResult):
+    head = ["검토항목", "구분", "건수", "중첩면적(m²)",
+            "사업지대비(%)", "최단거리(m)", "판정", "비고"]
+    rows = []
+    for f in result.findings:
+        rows.append([
+            f.check_name,
+            "중첩" if f.mode == "overlap" else "근접",
+            f.hit_count,
+            round(f.overlap_area_m2, 1) if f.mode == "overlap" else "-",
+            round(f.overlap_pct, 2) if f.mode == "overlap" else "-",
+            (round(f.min_distance_m, 1)
+             if f.min_distance_m is not None else "-"),
+            "<span class='warn'>검토필요</span>" if f.triggered else "해당없음",
+            f.note,
+        ])
+    return head, rows
+
+
+def summary_sentence(result: EiaResult):
+    t = result.triggered_count
+    if t == 0:
+        return ("전체 검토항목에서 임계기준 초과 사항이 확인되지 않았습니다. "
+                "단, 본 결과는 GIS 스크리닝 참고자료이며 법정 검토를 대체하지 않습니다.")
+    return (f"총 {len(result.findings)}개 항목 중 {t}개 항목에서 "
+            f"임계기준 초과가 확인되었습니다. 해당 항목에 대한 "
+            f"세부 검토 및 관계기관 협의 필요 여부를 확인하십시오.")
+```
+
+판정 문구는 단정형("협의대상임")이 아니라 **검토 유도형**으로 작성한다 —
+법적 판단 주체는 도구가 아니기 때문이다.
+
+## 22.1 결과 시각화 — 저촉 지역 하이라이트 레이어
+
+`finished()`(메인 스레드)에서 triggered 항목의 중첩 지오메트리를
+메모리 레이어로 만들어 캔버스에 표시한다.
+
+```python
+from qgis.core import (QgsVectorLayer, QgsFeature, QgsProject,
+                       QgsFillSymbol)
+from .compat import make_field, TYPE_STRING, TYPE_DOUBLE
+
+
+def make_conflict_layer(findings_geoms, crs):
+    """findings_geoms: [(항목명, QgsGeometry, 면적), ...]"""
+    vl = QgsVectorLayer(f"Polygon?crs={crs.authid()}", "환경저촉현황", "memory")
+    pr = vl.dataProvider()
+    pr.addAttributes([make_field("항목", TYPE_STRING, 60),
+                      make_field("면적_m2", TYPE_DOUBLE, 20, 1)])
+    vl.updateFields()
+
+    feats = []
+    for name, geom, area in findings_geoms:
+        f = QgsFeature(vl.fields())
+        f.setGeometry(geom)
+        f.setAttributes([name, area])
+        feats.append(f)
+    pr.addFeatures(feats)
+
+    sym = QgsFillSymbol.createSimple({
+        "color": "227,74,51,120", "outline_color": "178,24,43",
+        "outline_width": "0.6"})
+    vl.renderer().setSymbol(sym)
+    QgsProject.instance().addMapLayer(vl)
+    return vl
+```
+
+---
+
+# Chapter 23. EIA Screener — Processing Algorithm 노출
+
+배치 실행(대안 여러 개 스크리닝)을 위해 엔진을 알고리즘으로도 감싼다.
+
+```python
+# processing/eia_screening.py (발췌)
+from qgis.PyQt.QtCore import QCoreApplication
+from qgis.core import (QgsProcessingAlgorithm, QgsProcessing,
+                       QgsProcessingParameterFeatureSource,
+                       QgsProcessingParameterFile,
+                       QgsProcessingParameterNumber,
+                       QgsProcessingParameterFileDestination,
+                       QgsProcessingException)
+from ..core import eia_engine
+from ..core.eia_report import result_to_table, summary_sentence
+from ..core.report_builder_bridge import build_report_html  # Ch.10 재사용
+
+
+class EiaScreeningAlgorithm(QgsProcessingAlgorithm):
+    SITE = "SITE"
+    CONFIG = "CONFIG"
+    RADIUS = "RADIUS"
+    REPORT = "REPORT"
+
+    def tr(self, s):
+        return QCoreApplication.translate("EiaScreening", s)
+
+    def createInstance(self):
+        return EiaScreeningAlgorithm()
+
+    def name(self):
+        return "eiascreening"
+
+    def displayName(self):
+        return self.tr("환경영향 스크리닝")
+
+    def group(self):
+        return self.tr("환경영향성 평가")
+
+    def groupId(self):
+        return "eia"
+
+    def initAlgorithm(self, config=None):
+        self.addParameter(QgsProcessingParameterFeatureSource(
+            self.SITE, self.tr("사업지 경계"),
+            [QgsProcessing.TypeVectorPolygon]))
+        self.addParameter(QgsProcessingParameterFile(
+            self.CONFIG, self.tr("검토항목 설정(JSON)"),
+            extension="json"))
+        self.addParameter(QgsProcessingParameterNumber(
+            self.RADIUS, self.tr("탐색반경 (m)"),
+            QgsProcessingParameterNumber.Double, 2000.0))
+        self.addParameter(QgsProcessingParameterFileDestination(
+            self.REPORT, self.tr("보고서(HTML)"),
+            self.tr("HTML 파일 (*.html)")))
+
+    def processAlgorithm(self, parameters, context, feedback):
+        source = self.parameterAsSource(parameters, self.SITE, context)
+        cfg_path = self.parameterAsFile(parameters, self.CONFIG, context)
+        radius = self.parameterAsDouble(parameters, self.RADIUS, context)
+        out_html = self.parameterAsFileOutput(parameters, self.REPORT, context)
+
+        # 사업지 병합
+        geoms = [f.geometry() for f in source.getFeatures()]
+        if not geoms:
+            raise QgsProcessingException(self.tr("사업지 피처가 없습니다."))
+        site = geoms[0]
+        for g in geoms[1:]:
+            site = site.combine(g)
+
+        work_crs = source.sourceCrs()
+        if work_crs.isGeographic():
+            raise QgsProcessingException(
+                self.tr("투영좌표계(EPSG:5186 등) 사업지를 입력하세요."))
+
+        # 설정의 layer_hint를 프로젝트 레이어 이름과 자동 매칭 (연습문제로 개선)
+        from qgis.core import QgsProject
+        bindings = {}
+        for lyr in QgsProject.instance().mapLayers().values():
+            bindings[lyr.name()] = (lyr.source(), lyr.providerType())
+
+        checks = eia_engine.load_checks_config(cfg_path, bindings)
+        if not checks:
+            raise QgsProcessingException(
+                self.tr("설정의 검토항목과 매칭되는 레이어가 없습니다."))
+
+        result = eia_engine.run_screening(
+            checks, site, work_crs, radius,
+            progress=lambda p: feedback.setProgress(int(p)),
+            is_canceled=feedback.isCanceled)
+
+        head, rows = result_to_table(result)
+        html = build_report_html(
+            "환경영향성 스크리닝 결과",
+            [("사업지 면적", f"{result.site_area_m2:,.1f} m²"),
+             ("탐색반경", f"{radius:,.0f} m"),
+             ("종합", summary_sentence(result))],
+            head, rows)
+        with open(out_html, "w", encoding="utf-8") as fp:
+            fp.write(html)
+
+        for w in result.warnings:
+            feedback.pushWarning(w)
+        return {self.REPORT: out_html}
+```
+
+## 23.1 연습문제
+
+1. `layer_hint` 자동 매칭을 부분일치·수동 매핑 다이얼로그로 개선하라.
+2. triggered 항목의 중첩 지오메트리를 GeoPackage로 함께 내보내는
+   출력 파라미터(`QgsProcessingParameterVectorDestination`)를 추가하라.
+3. 선형 사업(도로·철도)을 위해 "중심선 + 편도 영향폭" 입력 모드를 추가하라.
+4. 검토항목 JSON의 스키마 검증 함수를 작성하고, 항목 오류 시
+   어떤 항목의 어떤 키가 잘못되었는지 사용자에게 알려라.
+
+---
+---
+
+# Part VI. 분야별 응용 (요약 설계)
+
+각 장은 "Part III~V 엔진의 조합 + 분야 특화 전처리" 구조로 집필한다.
+
+## Chapter 24. 도로 — 노선대 비교 · 대안노선 평가
+
+- 중심선(폴리라인) → 영향폭 폴리곤 전처리
+- 대안 A/B/C를 Processing **배치 모드**로 일괄 스크리닝
+- 대안별 비교표: 편입필지수 · 보호지역 저촉 · 급경사 통과연장 · 절성토 개산
+- 스테이셔닝(측점) 기반 종단 표고 추출 → 개략 종단검토
+
+## Chapter 25. 수자원 — 유역 기반 조사 · 취수원 보호
+
+- DEM 유역 추출(GRASS `r.watershed` 계열) → 조사경계를 행정경계가 아닌
+  **유역경계**로 설정하는 기초조사 변형
+- 상수원보호구역·수변구역 proximity 검사 강화
+- 하천 횡단 지점 자동 탐지(사업선형 ∩ 하천망)
+
+## Chapter 26. 철도 — 선형 제약과 정거장 입지
+
+- 최소곡선반경을 반영한 노선대 제약: 급경사 + 곡선 제약 결합
+- 정거장 입지: 인구·접근성 benefit 기준 중심의 SiteSelector 구성 예
+- 터널 구간 추정(표고 임계 초과 연장) 집계
+
+## Chapter 27. 도시계획 — 개발가능지 분석
+
+- 용도지역·개발제한구역·농업진흥지역을 제약 레이어로 결합
+- 경사·표고·기반시설 접근성 가중중첩 → 개발적지 등급도
+- 필지 단위 결과 조인: 적지등급을 연속지적도에 zonal statistics로 부여
+
+---
+---
+
+# Part VII. 품질 · 배포 · 유지보수
+
+## Chapter 28. 테스트
+
+핵심: `core/` 엔진은 QGIS GUI 없이 테스트한다.
+
+```python
+# tests/test_ahp.py
+import pytest
+from site_selector.core.ahp import ahp_weights
+
+
+def test_identity_matrix_equal_weights():
+    m = [[1, 1, 1], [1, 1, 1], [1, 1, 1]]
+    w, cr = ahp_weights(m)
+    assert all(abs(x - 1/3) < 1e-9 for x in w)
+    assert cr < 0.01
+
+
+def test_consistent_matrix():
+    m = [[1, 2, 4], [0.5, 1, 2], [0.25, 0.5, 1]]
+    w, cr = ahp_weights(m)
+    assert cr < 0.1
+    assert w[0] > w[1] > w[2]
+```
+
+PyQGIS 의존 테스트는 headless 초기화 후 실행한다.
+
+```python
+# tests/conftest.py
+import pytest
+from qgis.core import QgsApplication
+
+@pytest.fixture(scope="session")
+def qgis_app():
+    QgsApplication.setPrefixPath("/usr", True)   # 환경에 맞게
+    app = QgsApplication([], False)
+    app.initQgis()
+    yield app
+    app.exitQgis()
+```
+
+> **TIP** — CI에서는 `qgis/qgis` 공식 Docker 이미지(버전 태그별)를 사용해
+> 3.44와 4.x 컨테이너에서 동일 테스트를 병렬 실행한다.
+
+## Chapter 29. 3.x/4.x 이중 검증 절차
+
+```text
+① Ruff + pre-commit          — 스타일/기본 오류
+② pyqgis4-checker (Docker)   — Qt5 잔재·제거 API 정적 검출
+③ pytest @ QGIS 3.44 컨테이너
+④ pytest @ QGIS 4.x 컨테이너
+⑤ 수동 스모크: 3.44 / 4.2 데스크톱에서 3대 시나리오 실행
+⑥ (가능 시) 3.6 하한 스모크 또는 부록 A 대조표 정적 점검
+```
+
+## Chapter 30. 배포 — Plugin Repository와 CI/CD
+
+`qgis-plugin-ci` 기반 릴리스 파이프라인:
+
+```text
+git tag v1.0.0
+   ↓ GitHub Actions
+lint → test(3.44) → test(4.x)
+   ↓
+qgis-plugin-ci package  →  ZIP 검증(metadata, 구조)
+   ↓
+GitHub Release + QGIS Plugin Repository 업로드
+```
+
+배포 전 점검:
+
+- [ ] metadata.txt: qgisMinimumVersion / supportsQt6 / changelog
+- [ ] ZIP 최상위 폴더명 = 플러그인 폴더명
+- [ ] 외부 의존성 없음(표준 QGIS 번들만) 또는 명시적 안내
+- [ ] 아이콘·샘플데이터 라이선스 확인
+- [ ] 저장소 승인 가이드(https://plugins.qgis.org/docs/approval) 최신 정책 확인
+
+---
+---
+
+# 부록
+
+## 부록 A. 3.x ↔ 4.x API 대조 핵심표 (발췌)
+
+| 구분 | 3.x | 4.x | 교재 표준 |
+|---|---|---|---|
+| Qt 바인딩 | PyQt5 | PyQt6 | `qgis.PyQt` |
+| enum | 축약 허용 | 완전수식 강제 | 완전수식 |
+| 필드 타입 | `QVariant.*` | `QMetaType.Type.*` | compat.make_field |
+| exec | `exec_()` | `exec()` | `exec()` |
+| 리소스 | pyrcc5 qrc | pyrcc 제거 | 파일 경로 로드 |
+| 레이어 필터 | `QgsMapLayerProxyModel.*` | 신 API 병행 | 구 상수(전 구간 동작) |
+
+> 상세 대조는 공식 마이그레이션 문서를 기준으로 개정판마다 갱신한다:
+> https://plugins.qgis.org/docs/migrate-qgis4
+
+## 부록 B. 국내 데이터 소스 (플러그인 입력용)
+
+- 국가공간정보포털 NSDI — 연속지적도, 용도지역지구, 행정경계
+- 국토정보플랫폼(NGII) — 수치지형도, DEM
+- 환경공간정보서비스(EGIS) — 생태자연도, 국토환경성평가지도, 토지피복지도
+- 브이월드(V-World) — 오픈 API (배경지도·데이터)
+- WAMIS / 국가수자원관리종합정보 — 하천망·유역
+- 토지이음(LURIS) — 토지이용규제 확인
+- 산림청 — 산사태위험지도, 임상도
+- KTDB — 교통망
+
+> **주의** — 각 데이터의 이용약관·출처표시 의무·좌표계·갱신주기를
+> 플러그인 문서에 명시한다. 자동 다운로드 기능 구현 시 API 키 관리와
+> 약관 준수는 사용자 책임임을 안내한다.
+
+## 부록 C. metadata.txt 필드 해설 — Chapter 3.3 참조 확장 (집필 예정)
+
+## 부록 D. 참고자료 (프로젝트 사전조사 문서 기준)
+
+- PyQGIS Developer Cookbook (버전별): https://docs.qgis.org/
+- PyQGIS API: https://qgis.org/pyqgis/
+- QGIS C++ API: https://api.qgis.org/
+- 플러그인 개발: https://docs.qgis.org/4.2/en/docs/pyqgis_developer_cookbook/plugins/index.html
+- Processing 플러그인: https://docs.qgis.org/4.2/en/docs/pyqgis_developer_cookbook/processing.html
+- QGIS 4 마이그레이션: https://plugins.qgis.org/docs/migrate-qgis4
+- pyqgis4-checker: https://github.com/qgis/pyqgis4-checker
+- qgis-plugin-ci: https://github.com/qgis/qgis-plugin-ci
+- Plugin Builder 4: https://plugins.qgis.org/plugins/pluginbuilder4/
+- Qt 6: https://doc.qt.io/qt-6/
+
+라이선스 원칙(사전조사 §20 준수): 공식 문서는 참고자료로만 사용,
+설명 문장은 재구성, 예제 코드는 자체 작성, 출처·버전·URL 명기.
+
+---
+
+# 집필 로드맵 (다음 단계)
+
+```text
+본 초안(v0.1)
+  ↓
+① Part I~II 본문 확장 (스크린샷 · 실행결과 삽입)
+② Part III~V 코드를 실제 QGIS 3.44 / 4.2에서 전수 실행 검증
+   - 특히 래스터 계산기 알고리즘 ID/파라미터 버전별 확정 → compat 래퍼 완성
+③ Part VI 4개 장 본문 집필 (분야별 실데이터 예제)
+④ 예제 데이터셋 제작 (가공·배포 가능한 라이선스로)
+⑤ 부록 A 대조표 전수화 · 부록 C 완성
+⑥ 기술 감수 (3.6 하한 검증 포함) → 조판
+```
+
+**End of textbook draft v0.1 (2026-08-27)**
